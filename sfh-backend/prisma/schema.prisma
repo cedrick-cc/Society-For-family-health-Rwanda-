@@ -1,0 +1,394 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  COORDINATOR
+  FIELD_MANAGER
+  ANALYST
+  VOLUNTEER
+}
+
+enum UserStatus {
+  ACTIVE
+  PENDING
+  INACTIVE
+}
+
+enum PermissionModule {
+  DASHBOARD
+  PROGRAMS
+  VOLUNTEERS
+  BENEFICIARIES
+  GEOGRAPHIC
+  ANALYTICS
+  USER_MANAGEMENT
+  SYSTEM_SETTINGS
+  AUDIT_LOGS
+  ANNOUNCEMENTS
+}
+
+enum ProgramStatus {
+  PLANNED
+  ONGOING
+  COMPLETED
+}
+
+enum ProgramType {
+  HIV_AIDS_AWARENESS
+  MATERNAL_HEALTH
+  FAMILY_PLANNING
+  CHILD_NUTRITION
+  VACCINATION_CAMPAIGN
+}
+
+enum VolunteerOpsStatus {
+  AVAILABLE
+  ASSIGNED
+  ON_LEAVE
+}
+
+enum FieldReportStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum ResourceCategory {
+  HIV_AIDS_AWARENESS
+  MATERNAL_HEALTH
+  FAMILY_PLANNING
+  CHILD_NUTRITION
+  VACCINATION_CAMPAIGN
+}
+
+enum AuditSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+model User {
+  id                   String               @id @default(uuid())
+  name                 String
+  email                String               @unique
+  password             String
+  role                 UserRole
+  status               UserStatus
+  department           String?
+  emailNotifications   Boolean              @default(true)
+  programUpdates       Boolean              @default(true)
+  volunteerActivity    Boolean              @default(true)
+  mustChangePassword   Boolean              @default(false)
+  profileImage         String?
+  lastLogin            DateTime?
+  createdAt            DateTime             @default(now())
+  skills               String[]             @default([])
+  certifications       String[]             @default([])
+  volunteerOpsStatus   VolunteerOpsStatus   @default(AVAILABLE)
+  yearsOfExperience    Int                  @default(0)
+  volunteerDistrict    String?
+  bio                  String?
+  programsCreated      Program[]            @relation("ProgramCreator")
+  managedPrograms      Program[]            @relation("ProgramFieldManager")
+  beneficiariesCreated Beneficiary[]        @relation("BeneficiaryCreator")
+  fieldReports         FieldReport[]        @relation("VolunteerReports")
+  reviewedFieldReports FieldReport[]        @relation("FieldReportReviewer")
+  assignedTasks        Task[]               @relation("AssignedTasks")
+  createdTasks         Task[]               @relation("CreatedTasks")
+  programVolunteers    ProgramVolunteer[]   @relation("ProgramVolunteerMember")
+  volunteerAssignmentsMade ProgramVolunteer[] @relation("ProgramVolunteerAssignedBy")
+  notifications        Notification[]
+  conversationParticipants ConversationParticipant[]
+  messagesSent         Message[]            @relation("MessageSender")
+  activityLogs         ActivityLog[]
+  auditLogs            AuditLog[]
+  scheduledActivitiesCreated ScheduledActivity[] @relation("ScheduledActivityCreator")
+  scheduledActivityAssignments ScheduledActivityVolunteer[] @relation("ScheduledActivityVolunteer")
+}
+
+model Permission {
+  id        String           @id @default(uuid())
+  role      UserRole
+  module    PermissionModule
+  allowed   Boolean          @default(false)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@unique([role, module])
+}
+
+model Program {
+  id                  String             @id @default(uuid())
+  title               String
+  description         String
+  district            String
+  sector              String?
+  startDate           DateTime
+  endDate             DateTime
+  status              ProgramStatus
+  programType         ProgramType
+  targetBeneficiaries Int                @default(0)
+  volunteersNeeded    Int                @default(0)
+  progress            Int                @default(0)
+  createdById         String
+  fieldManagerId      String?
+  createdBy           User               @relation("ProgramCreator", fields: [createdById], references: [id])
+  fieldManager        User?              @relation("ProgramFieldManager", fields: [fieldManagerId], references: [id])
+  fieldReports        FieldReport[]
+  beneficiaries       Beneficiary[]
+  programVolunteers   ProgramVolunteer[]
+  tasks               Task[]
+  programResources    ProgramResource[]
+  scheduledActivities ScheduledActivity[]
+}
+
+model ProgramVolunteer {
+  id           String   @id @default(uuid())
+  programId    String
+  volunteerId  String
+  assignedById String
+  assignedAt   DateTime @default(now())
+  program      Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
+  volunteer    User     @relation("ProgramVolunteerMember", fields: [volunteerId], references: [id], onDelete: Cascade)
+  assignedBy   User     @relation("ProgramVolunteerAssignedBy", fields: [assignedById], references: [id])
+
+  @@unique([programId, volunteerId])
+  @@index([programId])
+  @@index([volunteerId])
+}
+
+model Beneficiary {
+  id                String    @id @default(uuid())
+  fullName          String
+  gender            String
+  age               Int
+  phone             String?
+  district          String
+  sector            String?
+  village           String?
+  riskLevel         String    @default("medium")
+  householdSize     Int       @default(1)
+  servicesReceived  String[]  @default([])
+  assignedProgramId String?
+  assignedProgram   Program?  @relation(fields: [assignedProgramId], references: [id])
+  registeredById    String
+  registeredBy      User      @relation("BeneficiaryCreator", fields: [registeredById], references: [id])
+  registrationDate  DateTime  @default(now())
+  lastVisit         DateTime?
+  status            String    @default("active")
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+model FieldReport {
+  id                 String            @id @default(uuid())
+  volunteerId        String
+  programId          String
+  taskId             String?
+  location           String
+  latitude           Float
+  longitude          Float
+  beneficiariesCount Int
+  notes              String
+  activityOutcome    String?
+  evidenceUrls       String[]          @default([])
+  status             FieldReportStatus @default(PENDING)
+  reviewedById       String?
+  reviewedAt         DateTime?
+  reviewNotes        String?
+  createdAt          DateTime          @default(now())
+  volunteer          User              @relation("VolunteerReports", fields: [volunteerId], references: [id])
+  program            Program           @relation(fields: [programId], references: [id], onDelete: Cascade)
+  task               Task?             @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  reviewedBy         User?             @relation("FieldReportReviewer", fields: [reviewedById], references: [id])
+
+  @@index([programId])
+  @@index([volunteerId])
+  @@index([status])
+}
+
+model Task {
+  id               String       @id @default(uuid())
+  title            String
+  description      String       @default("")
+  programId        String
+  assignedToId     String
+  assignedById     String
+  status           TaskStatus   @default(PENDING)
+  priority         TaskPriority @default(MEDIUM)
+  dueDate          DateTime
+  location         String       @default("")
+  progress         Int          @default(0)
+  completionNotes  String?
+  /** JSON array: { at, status, progress, note?, userId, userName } */
+  progressHistory  Json         @default("[]")
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  program          Program      @relation(fields: [programId], references: [id], onDelete: Cascade)
+  assignedTo       User         @relation("AssignedTasks", fields: [assignedToId], references: [id])
+  assignedBy       User         @relation("CreatedTasks", fields: [assignedById], references: [id])
+  fieldReports     FieldReport[]
+
+  @@index([programId])
+  @@index([assignedToId])
+  @@index([assignedById])
+}
+
+model Resource {
+  id                  String            @id @default(uuid())
+  name                String
+  category            ResourceCategory
+  resourceKey         String?           @unique
+  quantityAvailable   Int               @default(0)
+  unit                String            @default("units")
+  lowStockThreshold   Int               @default(10)
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  programResources    ProgramResource[]
+
+  @@index([category])
+}
+
+model ProgramResource {
+  programId         String
+  resourceId        String
+  quantityAssigned  Int      @default(0)
+  quantityUsed      Int      @default(0)
+  program           Program  @relation(fields: [programId], references: [id], onDelete: Cascade)
+  resource          Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+
+  @@id([programId, resourceId])
+  @@index([programId])
+  @@index([resourceId])
+}
+
+model ActivityLog {
+  id          String   @id @default(uuid())
+  actionType  String
+  description String
+  userId      String?
+  targetType  String?
+  targetId    String?
+  createdAt   DateTime @default(now())
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([actionType])
+}
+
+model AuditLog {
+  id          String        @id @default(uuid())
+  action      String
+  module      String
+  severity    AuditSeverity @default(INFO)
+  description String
+  userId      String?
+  userName    String?
+  ipAddress   String?
+  targetType  String?
+  targetId    String?
+  createdAt   DateTime      @default(now())
+  user        User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([module])
+  @@index([severity])
+}
+
+model Notification {
+  id           String   @id @default(uuid())
+  userId       String
+  type         String
+  category     String?
+  title        String
+  body         String
+  read         Boolean  @default(false)
+  linkPath     String?
+  linkTargetId String?
+  createdAt    DateTime @default(now())
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+  @@index([createdAt])
+}
+
+model Conversation {
+  id           String                    @id @default(uuid())
+  createdAt    DateTime                  @default(now())
+  updatedAt    DateTime                  @updatedAt
+  participants ConversationParticipant[]
+  messages     Message[]
+}
+
+model ConversationParticipant {
+  conversationId String
+  userId         String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([conversationId, userId])
+  @@index([userId])
+}
+
+model Message {
+  id             String       @id @default(uuid())
+  conversationId String
+  senderId       String
+  content        String
+  isRead         Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         User         @relation("MessageSender", fields: [senderId], references: [id])
+
+  @@index([conversationId, createdAt])
+}
+
+model ScheduledActivity {
+  id           String   @id @default(uuid())
+  title        String
+  description  String   @default("")
+  date         DateTime
+  time         String
+  district     String
+  programId    String?
+  createdById  String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  program      Program? @relation(fields: [programId], references: [id], onDelete: SetNull)
+  createdBy    User     @relation("ScheduledActivityCreator", fields: [createdById], references: [id])
+  assignments  ScheduledActivityVolunteer[]
+
+  @@index([date])
+  @@index([programId])
+  @@index([createdById])
+}
+
+model ScheduledActivityVolunteer {
+  scheduledActivityId String
+  volunteerId         String
+  scheduledActivity   ScheduledActivity @relation(fields: [scheduledActivityId], references: [id], onDelete: Cascade)
+  volunteer           User              @relation("ScheduledActivityVolunteer", fields: [volunteerId], references: [id], onDelete: Cascade)
+
+  @@id([scheduledActivityId, volunteerId])
+  @@index([volunteerId])
+}

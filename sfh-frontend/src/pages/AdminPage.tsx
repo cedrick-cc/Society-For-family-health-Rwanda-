@@ -1,0 +1,730 @@
+import React, { useEffect, useState } from 'react';
+import { fetchAuditLogs } from '@/lib/api';
+import { getUsers, getPendingUsers, approveUser, rejectUser, deactivateUser, resetUserPassword, updateUser, getPermissions, updatePermissionValue } from '@/services/api';
+import { EmptyState } from '@/components/ui/empty-state';
+import { motion } from 'framer-motion';
+import {
+  Plus,
+  Search,
+  Filter,
+  MoreVertical,
+  Shield,
+  ShieldCheck,
+  ShieldAlert,
+  Edit,
+  Trash2,
+  UserPlus,
+  Mail,
+  Calendar,
+  Clock,
+  FileText,
+  Bell,
+  Settings,
+  Key,
+  Eye,
+  EyeOff,
+  CheckCircle2,
+  AlertTriangle,
+  Info,
+} from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Switch } from '@/components/ui/switch';
+import { cn } from '@/lib/utils';
+import AddUserModal from '@/components/modals/AddUserModal';
+import { toast } from 'sonner';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
+
+interface SystemUser {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  department?: string;
+  status: 'active' | 'inactive' | 'pending';
+  lastLogin?: string;
+  createdAt: string;
+  volunteerOpsStatus?: string;
+  skills?: string[];
+  volunteerDistrict?: string;
+}
+
+interface AuditLog {
+  id: number;
+  user: string;
+  action: string;
+  module: string;
+  details: string;
+  timestamp: string;
+  severity: 'info' | 'warning' | 'critical';
+}
+
+interface BackendUser {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  status: string;
+  department?: string | null;
+  createdAt: string;
+  lastLogin?: string | null;
+  volunteerOpsStatus?: string;
+  skills?: string[];
+  volunteerDistrict?: string | null;
+}
+
+interface PermissionRecord {
+  role: string;
+  module: string;
+  allowed: boolean;
+}
+
+const permissionModules = [
+  { key: 'DASHBOARD', label: 'Dashboard' },
+  { key: 'PROGRAMS', label: 'Programs' },
+  { key: 'VOLUNTEERS', label: 'Volunteers' },
+  { key: 'BENEFICIARIES', label: 'Beneficiaries' },
+  { key: 'GEOGRAPHIC', label: 'Geographic' },
+  { key: 'ANALYTICS', label: 'Analytics' },
+  { key: 'USER_MANAGEMENT', label: 'User Management' },
+  { key: 'SYSTEM_SETTINGS', label: 'System Settings' },
+  { key: 'AUDIT_LOGS', label: 'Audit Logs' },
+  { key: 'ANNOUNCEMENTS', label: 'Announcements' },
+];
+
+const permissionRoles = [
+  { key: 'ADMIN', label: 'Admin' },
+  { key: 'COORDINATOR', label: 'Coordinator' },
+  { key: 'FIELD_MANAGER', label: 'Field Manager' },
+  { key: 'ANALYST', label: 'Analyst' },
+  { key: 'VOLUNTEER', label: 'Volunteer' },
+];
+
+const roleValueOptions = ['ADMIN', 'COORDINATOR', 'FIELD_MANAGER', 'ANALYST', 'VOLUNTEER'] as const;
+const statusValueOptions = ['ACTIVE', 'PENDING', 'INACTIVE'] as const;
+
+const toBackendRole = (role: string) => role.toUpperCase();
+const toBackendStatus = (status: string) => status.toUpperCase();
+
+const formatRoleLabel = (role: string) =>
+  role
+    .toLowerCase()
+    .split('_')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+
+const formatLastLogin = (value?: string | null) => {
+  if (!value) return 'Never logged in';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Never logged in';
+  return date.toLocaleString();
+};
+
+const AdminPage: React.FC = () => {
+  const [systemUsers, setSystemUsers] = useState<SystemUser[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeTab, setActiveTab] = useState('users');
+  const [showAddUser, setShowAddUser] = useState(false);
+  const [resetPasswordModal, setResetPasswordModal] = useState<{ open: boolean; email: string; password: string }>({ open: false, email: '', password: '' });
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editDepartment, setEditDepartment] = useState('');
+  const [editRole, setEditRole] = useState('COORDINATOR');
+  const [editStatus, setEditStatus] = useState('ACTIVE');
+  const [editVolunteerOps, setEditVolunteerOps] = useState('AVAILABLE');
+  const [editSkills, setEditSkills] = useState('');
+  const [editVolunteerDistrict, setEditVolunteerDistrict] = useState('');
+  const [permissions, setPermissions] = useState<PermissionRecord[]>([]);
+
+  const normalizeUser = (user: BackendUser): SystemUser => ({
+    id: String(user.id),
+    name: user.name,
+    email: user.email,
+    role: String(user.role || '').toLowerCase(),
+    department: user.department || '',
+    status: String(user.status || '').toLowerCase() as SystemUser['status'],
+    lastLogin: user.lastLogin || null,
+    createdAt: user.createdAt,
+    volunteerOpsStatus: user.volunteerOpsStatus,
+    skills: user.skills,
+    volunteerDistrict: user.volunteerDistrict || undefined,
+  });
+
+  const loadUsers = async () => {
+    try {
+      const users = await getUsers();
+      setSystemUsers((users || []).map(normalizeUser));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to load users.');
+    }
+  };
+
+  const loadPendingUsers = async () => {
+    try {
+      const pendingUsers = await getPendingUsers();
+      setPendingApprovals((pendingUsers || []).map(normalizeUser));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to load pending users.');
+    }
+  };
+
+  const refreshUsersData = async () => {
+    await Promise.all([loadUsers(), loadPendingUsers()]);
+  };
+
+  const loadPermissions = async () => {
+    try {
+      const data = await getPermissions();
+      setPermissions(data || []);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to load permissions.');
+    }
+  };
+
+  useEffect(() => {
+    refreshUsersData();
+    loadPermissions();
+    fetchAuditLogs().then((data) => setAuditLogs(data as AuditLog[]));
+  }, []);
+
+  const [pendingApprovals, setPendingApprovals] = useState<SystemUser[]>([]);
+
+  const handleApprove = async (id: string) => {
+    try {
+      const response = await approveUser(id);
+      toast.success(response.message || 'User approved successfully.');
+      await refreshUsersData();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to approve user.');
+    }
+  };
+
+  const handleReject = async (id: string) => {
+    try {
+      const response = await rejectUser(id);
+      toast.success(response.message || 'User rejected successfully.');
+      await refreshUsersData();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to reject user.');
+    }
+  };
+
+  const openEditModal = (user: SystemUser) => {
+    setEditingUserId(user.id);
+    setEditName(user.name);
+    setEditDepartment(user.department || '');
+    setEditRole(toBackendRole(user.role));
+    setEditStatus(toBackendStatus(user.status));
+    if (user.role === 'volunteer') {
+      setEditVolunteerOps(user.volunteerOpsStatus || 'AVAILABLE');
+      setEditSkills((user.skills || []).join(', '));
+      setEditVolunteerDistrict(user.volunteerDistrict || '');
+    } else {
+      setEditVolunteerOps('AVAILABLE');
+      setEditSkills('');
+      setEditVolunteerDistrict('');
+    }
+    setEditModalOpen(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingUserId) return;
+
+    try {
+      const payload: Record<string, unknown> = {
+        name: editName,
+        department: editDepartment,
+        role: editRole,
+        status: editStatus,
+      };
+      if (editRole === 'VOLUNTEER') {
+        payload.volunteerOpsStatus = editVolunteerOps;
+        payload.skills = editSkills
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean);
+        payload.volunteerDistrict = editVolunteerDistrict.trim() || null;
+      }
+      const response = await updateUser(editingUserId, payload);
+      toast.success(response.message || 'User updated successfully.');
+      setEditModalOpen(false);
+      await refreshUsersData();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to update user.');
+    }
+  };
+
+  const handleDeactivate = async (user: SystemUser) => {
+    try {
+      const response = await deactivateUser(user.id);
+      toast.success(response.message || `${user.name} deactivated.`);
+      await refreshUsersData();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to deactivate user.');
+    }
+  };
+
+  const handleResetPassword = async (user: SystemUser) => {
+    try {
+      const response = await resetUserPassword(user.id);
+      setResetPasswordModal({
+        open: true,
+        email: user.email,
+        password: response.temporaryPassword || '',
+      });
+      toast.success(response.message || 'Password reset successfully.');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to reset password.');
+    }
+  };
+
+  const getPermissionValue = (moduleName: string, role: string) => {
+    return permissions.some((permission) => permission.module === moduleName && permission.role === role && permission.allowed);
+  };
+
+  const handlePermissionToggle = async (moduleName: string, role: string, allowed: boolean) => {
+    setPermissions((prev) => {
+      const found = prev.find((permission) => permission.module === moduleName && permission.role === role);
+      if (!found) return [...prev, { module: moduleName, role, allowed }];
+
+      return prev.map((permission) =>
+        permission.module === moduleName && permission.role === role
+          ? { ...permission, allowed }
+          : permission
+      );
+    });
+
+    try {
+      await updatePermissionValue({ module: moduleName, role, allowed });
+      toast.success('Permission updated.');
+    } catch (error) {
+      setPermissions((prev) =>
+        prev.map((permission) =>
+          permission.module === moduleName && permission.role === role
+            ? { ...permission, allowed: !allowed }
+            : permission
+        )
+      );
+      toast.error(error instanceof Error ? error.message : 'Failed to update permission.');
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'active':
+        return <Badge className="bg-success/10 text-success border-success/20 border">Active</Badge>;
+      case 'inactive':
+        return <Badge className="bg-muted text-muted-foreground border">Inactive</Badge>;
+      case 'pending':
+        return <Badge className="bg-warning/10 text-warning border-warning/20 border">Pending</Badge>;
+      default:
+        return null;
+    }
+  };
+
+  const getSeverityIcon = (severity: string) => {
+    switch (severity) {
+      case 'info':
+        return <Info className="w-4 h-4 text-info" />;
+      case 'warning':
+        return <AlertTriangle className="w-4 h-4 text-warning" />;
+      case 'critical':
+        return <ShieldAlert className="w-4 h-4 text-destructive" />;
+      default:
+        return null;
+    }
+  };
+
+  const filteredUsers = systemUsers.filter(
+    (user) =>
+      user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      user.role.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="space-y-6"
+    >
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-display font-bold">System Administration</h1>
+          <p className="text-muted-foreground mt-1">
+            Manage users, permissions, and system settings
+          </p>
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card className="sfh-card p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+              <Shield className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Total Users</p>
+              <p className="text-2xl font-bold">{systemUsers.length}</p>
+            </div>
+          </div>
+        </Card>
+        <Card className="sfh-card p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-success/10 flex items-center justify-center">
+              <ShieldCheck className="w-5 h-5 text-success" />
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Active</p>
+              <p className="text-2xl font-bold">{systemUsers.filter((u) => u.status === 'active').length}</p>
+            </div>
+          </div>
+        </Card>
+        <Card className="sfh-card p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-warning/10 flex items-center justify-center">
+              <Clock className="w-5 h-5 text-warning" />
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Pending</p>
+              <p className="text-2xl font-bold">{systemUsers.filter((u) => u.status === 'pending').length}</p>
+            </div>
+          </div>
+        </Card>
+        <Card className="sfh-card p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-destructive/10 flex items-center justify-center">
+              <ShieldAlert className="w-5 h-5 text-destructive" />
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Security Alerts</p>
+              <p className="text-2xl font-bold">{auditLogs.filter((l) => l.severity === 'critical').length}</p>
+            </div>
+          </div>
+        </Card>
+      </div>
+
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="grid w-full grid-cols-2 max-w-sm">
+          <TabsTrigger value="users">Users</TabsTrigger>
+          <TabsTrigger value="permissions">Permissions</TabsTrigger>
+        </TabsList>
+
+        {/* Users Tab */}
+        <TabsContent value="users" className="mt-6 space-y-4">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search users..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <Button className="gap-2" onClick={() => setShowAddUser(true)}>
+              <UserPlus className="w-4 h-4" />
+              Add User
+            </Button>
+          </div>
+
+          <AddUserModal open={showAddUser} onOpenChange={setShowAddUser} onUserCreated={refreshUsersData} />
+
+          <Card className="sfh-card overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/50">
+                  <TableHead className="font-semibold">User</TableHead>
+                  <TableHead className="font-semibold">Role</TableHead>
+                  <TableHead className="font-semibold">Department</TableHead>
+                  <TableHead className="font-semibold">Status</TableHead>
+                  <TableHead className="font-semibold">Last Login</TableHead>
+                  <TableHead className="text-right font-semibold">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredUsers.map((user) => (
+                  <TableRow key={user.id} className="hover:bg-muted/30">
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-10 w-10">
+                          <AvatarFallback className="bg-primary/10 text-primary font-semibold text-sm">
+                            {user.name
+                              .split(' ')
+                              .map((n) => n[0])
+                              .join('')
+                              .slice(0, 2)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <p className="font-medium">{user.name}</p>
+                          <p className="text-xs text-muted-foreground">{user.email}</p>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="secondary">{formatRoleLabel(user.role)}</Badge>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{user.department}</TableCell>
+                    <TableCell>{getStatusBadge(user.status)}</TableCell>
+                    <TableCell className="text-muted-foreground text-sm">{formatLastLogin(user.lastLogin)}</TableCell>
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreVertical className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => openEditModal(user)}>
+                            <Edit className="w-4 h-4 mr-2" />
+                            Edit User
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleResetPassword(user)}>
+                            <Key className="w-4 h-4 mr-2" />
+                            Reset Password
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="text-destructive" onClick={() => handleDeactivate(user)}>
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Deactivate
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Card>
+
+          <Card className="sfh-card">
+            <CardHeader>
+              <CardTitle className="text-lg">Pending Approvals</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {pendingApprovals.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No pending users.</p>
+              ) : (
+                pendingApprovals.map((user) => (
+                  <div
+                    key={user.id}
+                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg border p-3"
+                  >
+                    <div>
+                      <p className="font-medium">{user.name}</p>
+                      <p className="text-sm text-muted-foreground">{user.email}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Role: {user.role} {user.department ? `• ${user.department}` : ''}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button size="sm" onClick={() => handleApprove(user.id)}>
+                        Approve
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => handleReject(user.id)}>
+                        Reject
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Permissions Tab */}
+        <TabsContent value="permissions" className="mt-6">
+          <Card className="sfh-card overflow-hidden">
+            <CardHeader>
+              <CardTitle className="text-lg font-semibold">Role-Based Access Matrix</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/50">
+                    <TableHead className="font-semibold">Module</TableHead>
+                    <TableHead className="text-center font-semibold">Admin</TableHead>
+                    <TableHead className="text-center font-semibold">Coordinator</TableHead>
+                    <TableHead className="text-center font-semibold">Field Manager</TableHead>
+                    <TableHead className="text-center font-semibold">Analyst</TableHead>
+                    <TableHead className="text-center font-semibold">Volunteer</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {permissionModules.map((moduleItem) => (
+                    <TableRow key={moduleItem.key}>
+                      <TableCell className="font-medium">{moduleItem.label}</TableCell>
+                      {permissionRoles.map((roleItem) => (
+                        <TableCell key={`${moduleItem.key}-${roleItem.key}`} className="text-center">
+                          <div className="flex justify-center">
+                            <Switch
+                              checked={getPermissionValue(moduleItem.key, roleItem.key)}
+                              onCheckedChange={(checked) => handlePermissionToggle(moduleItem.key, roleItem.key, checked)}
+                            />
+                          </div>
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+      </Tabs>
+
+      {/* Reset Password Modal */}
+      <Dialog open={resetPasswordModal.open} onOpenChange={(open) => setResetPasswordModal((prev) => ({ ...prev, open }))}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 rounded-full bg-success/10 flex items-center justify-center">
+                <CheckCircle2 className="w-5 h-5 text-success" />
+              </div>
+              <DialogTitle className="text-lg">Password Reset Successful</DialogTitle>
+            </div>
+            <DialogDescription>A new temporary password has been generated.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground">Email</p>
+                  <p className="font-medium text-sm">{resetPasswordModal.email}</p>
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground">New Temporary Password</p>
+                  <p className="font-mono font-medium text-sm">{resetPasswordModal.password}</p>
+                </div>
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { navigator.clipboard.writeText(resetPasswordModal.password); toast.success('Copied'); }}>
+                  <Eye className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+            </div>
+            <div className="flex items-start gap-2 rounded-lg bg-warning/10 border border-warning/20 p-3">
+              <ShieldAlert className="w-4 h-4 text-warning mt-0.5 shrink-0" />
+              <p className="text-xs text-muted-foreground">Share this password securely. The user should change it upon first login.</p>
+            </div>
+            <Button className="w-full" onClick={() => setResetPasswordModal({ open: false, email: '', password: '' })}>Done</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit User</DialogTitle>
+            <DialogDescription>Update user details and save changes.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">Name</p>
+              <Input value={editName} onChange={(e) => setEditName(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">Department</p>
+              <Input value={editDepartment} onChange={(e) => setEditDepartment(e.target.value)} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">Role</p>
+                <Select value={editRole} onValueChange={setEditRole}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {roleValueOptions.map((roleOption) => (
+                      <SelectItem key={roleOption} value={roleOption}>
+                        {formatRoleLabel(roleOption)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">Status</p>
+                <Select value={editStatus} onValueChange={setEditStatus}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {statusValueOptions.map((statusOption) => (
+                      <SelectItem key={statusOption} value={statusOption}>
+                        {formatRoleLabel(statusOption)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            {editRole === 'VOLUNTEER' && (
+              <div className="space-y-3 rounded-lg border p-3 bg-muted/20">
+                <p className="text-xs font-semibold text-muted-foreground uppercase">Volunteer operations</p>
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">Availability</p>
+                  <Select value={editVolunteerOps} onValueChange={setEditVolunteerOps}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="AVAILABLE">Available</SelectItem>
+                      <SelectItem value="ASSIGNED">Assigned</SelectItem>
+                      <SelectItem value="ON_LEAVE">On leave</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">Skills (comma-separated)</p>
+                  <Input value={editSkills} onChange={(e) => setEditSkills(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">Home district</p>
+                  <Input value={editVolunteerDistrict} onChange={(e) => setEditVolunteerDistrict(e.target.value)} />
+                </div>
+              </div>
+            )}
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setEditModalOpen(false)}>Cancel</Button>
+              <Button onClick={handleSaveEdit}>Save</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </motion.div>
+  );
+};
+
+export default AdminPage;

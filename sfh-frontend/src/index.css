@@ -1,0 +1,411 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* SFH-OMS Design System - Society for Family Health Rwanda */
+/* Brand Colors: SFH Blue, Vibrant Green, Orange Accent */
+
+@layer base {
+  :root {
+    /* SFH Brand Colors - Inspired by sfhrwanda.org.rw */
+    --background: 210 40% 98%;
+    --foreground: 220 30% 15%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 30% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 30% 15%;
+
+    /* Primary - SFH Blue (from website hero) */
+    --primary: 222 72% 42%;
+    --primary-foreground: 0 0% 100%;
+    --primary-light: 222 70% 55%;
+    --primary-dark: 222 75% 32%;
+
+    /* Secondary - SFH Vibrant Green */
+    --secondary: 120 70% 45%;
+    --secondary-foreground: 0 0% 100%;
+
+    /* Accent - SFH Orange */
+    --accent: 24 95% 55%;
+    --accent-foreground: 0 0% 100%;
+    --accent-light: 24 95% 65%;
+
+    /* Muted - Soft blue-tinted neutrals */
+    --muted: 210 30% 95%;
+    --muted-foreground: 220 15% 45%;
+
+    /* Status Colors */
+    --success: 120 65% 42%;
+    --success-foreground: 0 0% 100%;
+    --warning: 40 95% 50%;
+    --warning-foreground: 220 30% 15%;
+    --info: 200 80% 50%;
+    --info-foreground: 0 0% 100%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* Program Status Colors */
+    --status-planned: 222 72% 50%;
+    --status-ongoing: 120 65% 42%;
+    --status-completed: 24 95% 55%;
+
+    --border: 210 25% 88%;
+    --input: 210 25% 92%;
+    --ring: 222 72% 42%;
+
+    --radius: 0.75rem;
+
+    /* Sidebar - Oxford Blue (#002147) */
+    --sidebar-background: 212 100% 14%;
+    --sidebar-foreground: 210 20% 90%;
+    --sidebar-primary: 120 70% 50%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 212 80% 20%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 212 70% 18%;
+    --sidebar-ring: 120 70% 50%;
+    --sidebar-muted: 210 15% 60%;
+
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(222 72% 42%) 0%, hsl(222 70% 55%) 100%);
+    --gradient-secondary: linear-gradient(135deg, hsl(120 70% 45%) 0%, hsl(140 70% 50%) 100%);
+    --gradient-accent: linear-gradient(135deg, hsl(24 95% 55%) 0%, hsl(40 95% 55%) 100%);
+    --gradient-hero: linear-gradient(135deg, hsl(222 72% 38%) 0%, hsl(222 65% 48%) 50%, hsl(200 60% 50%) 100%);
+    --gradient-card: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(210 40% 98%) 100%);
+    --gradient-sidebar: linear-gradient(180deg, hsl(212 100% 14%) 0%, hsl(212 100% 10%) 100%);
+    --gradient-background: linear-gradient(135deg, hsl(210 40% 98%) 0%, hsl(210 50% 96%) 50%, hsl(220 45% 97%) 100%);
+
+    /* Shadows */
+    --shadow-sm: 0 1px 2px 0 hsl(222 30% 15% / 0.05);
+    --shadow-md: 0 4px 6px -1px hsl(222 30% 15% / 0.08), 0 2px 4px -1px hsl(222 30% 15% / 0.04);
+    --shadow-lg: 0 10px 15px -3px hsl(222 30% 15% / 0.1), 0 4px 6px -2px hsl(222 30% 15% / 0.05);
+    --shadow-xl: 0 20px 25px -5px hsl(222 30% 15% / 0.1), 0 10px 10px -5px hsl(222 30% 15% / 0.04);
+    --shadow-card: 0 4px 20px -2px hsl(222 30% 15% / 0.08);
+    --shadow-glow: 0 0 40px -10px hsl(222 72% 42% / 0.3);
+    --shadow-glow-green: 0 0 40px -10px hsl(120 70% 45% / 0.3);
+  }
+
+  .dark {
+    --background: 222 35% 8%;
+    --foreground: 210 30% 95%;
+
+    --card: 222 35% 12%;
+    --card-foreground: 210 30% 95%;
+
+    --popover: 222 35% 12%;
+    --popover-foreground: 210 30% 95%;
+
+    --primary: 222 70% 55%;
+    --primary-foreground: 0 0% 100%;
+    --primary-light: 222 65% 65%;
+    --primary-dark: 222 72% 42%;
+
+    --secondary: 120 60% 50%;
+    --secondary-foreground: 222 35% 8%;
+
+    --accent: 24 90% 60%;
+    --accent-foreground: 222 35% 8%;
+
+    --muted: 222 30% 18%;
+    --muted-foreground: 210 20% 60%;
+
+    --border: 222 30% 22%;
+    --input: 222 30% 22%;
+    --ring: 222 70% 55%;
+
+    /* Dark Sidebar */
+    --sidebar-background: 222 40% 6%;
+    --sidebar-foreground: 210 20% 85%;
+    --sidebar-accent: 222 35% 14%;
+    --sidebar-border: 222 30% 15%;
+
+    /* Dark mode status colors */
+    --success: 120 55% 48%;
+    --warning: 40 90% 55%;
+    --info: 200 75% 55%;
+
+    /* Dark gradients */
+    --gradient-background: linear-gradient(135deg, hsl(222 35% 8%) 0%, hsl(222 40% 10%) 50%, hsl(225 38% 9%) 100%);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "cv11", "ss01", "ss03";
+    background: var(--gradient-background);
+    min-height: 100vh;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
+    @apply font-semibold tracking-tight;
+  }
+}
+
+@layer components {
+  /* SFH Card Styles */
+  .sfh-card {
+    @apply bg-card rounded-xl border shadow-[var(--shadow-card)] transition-all duration-300;
+  }
+
+  .sfh-card:hover {
+    @apply shadow-[var(--shadow-lg)] -translate-y-0.5;
+  }
+
+  /* Status Badges - SFH Brand Colors */
+  .status-planned {
+    @apply bg-primary/10 text-primary border-primary/20;
+  }
+
+  .status-ongoing {
+    @apply bg-secondary/10 text-secondary border-secondary/20;
+  }
+
+  .status-completed {
+    @apply bg-accent/10 text-accent border-accent/20;
+  }
+
+  /* Gradient Text */
+  .text-gradient {
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .text-gradient-green {
+    background: var(--gradient-secondary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Glass Effect */
+  .glass {
+    @apply bg-white/80 backdrop-blur-xl border border-white/20;
+  }
+
+  .dark .glass {
+    @apply bg-card/80 border-border/30;
+  }
+
+  /* KPI Card */
+  .kpi-card {
+    @apply sfh-card p-6 relative overflow-hidden;
+  }
+
+  .kpi-card::before {
+    content: '';
+    @apply absolute top-0 right-0 w-32 h-32 opacity-5 rounded-full -translate-y-1/2 translate-x-1/2;
+    background: var(--gradient-primary);
+  }
+
+  /* Map Container */
+  .map-container {
+    @apply rounded-xl overflow-hidden border shadow-[var(--shadow-lg)];
+  }
+
+  /* Module Header */
+  .module-header {
+    @apply flex items-center justify-between pb-6 border-b mb-6;
+  }
+
+  /* Table Styles */
+  .sfh-table {
+    @apply w-full;
+  }
+
+  .sfh-table th {
+    @apply text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider py-3 px-4 bg-muted/50;
+  }
+
+  .sfh-table td {
+    @apply py-4 px-4 border-b border-border/50;
+  }
+
+  .sfh-table tr:hover td {
+    @apply bg-muted/30;
+  }
+
+  /* Sidebar Active State */
+  .sidebar-link-active {
+    @apply bg-sidebar-accent text-sidebar-primary-foreground;
+  }
+
+  /* Login Background Pattern - SFH themed */
+  .login-pattern {
+    background-image: 
+      radial-gradient(circle at 20% 50%, hsl(222 72% 42% / 0.08) 0%, transparent 50%),
+      radial-gradient(circle at 80% 20%, hsl(24 95% 55% / 0.06) 0%, transparent 40%),
+      radial-gradient(circle at 60% 80%, hsl(120 70% 45% / 0.05) 0%, transparent 45%);
+  }
+
+  /* Dashboard Background Pattern */
+  .dashboard-pattern {
+    @apply relative;
+  }
+
+  .dashboard-pattern::before {
+    content: '';
+    @apply absolute inset-0 pointer-events-none;
+    background-image: 
+      radial-gradient(circle at 10% 20%, hsl(222 72% 42% / 0.03) 0%, transparent 30%),
+      radial-gradient(circle at 90% 80%, hsl(120 70% 45% / 0.03) 0%, transparent 30%);
+  }
+
+  /* Pulse Animation for Live Indicators */
+  .pulse-live {
+    @apply relative;
+  }
+
+  .pulse-live::after {
+    content: '';
+    @apply absolute top-0 right-0 w-3 h-3 bg-secondary rounded-full;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.5;
+      transform: scale(1.2);
+    }
+  }
+
+  /* Button Enhancements */
+  .btn-glow {
+    @apply transition-shadow duration-300;
+  }
+
+  .btn-glow:hover {
+    box-shadow: 0 0 20px -5px hsl(var(--primary) / 0.4);
+  }
+
+  .btn-glow-green:hover {
+    box-shadow: 0 0 20px -5px hsl(var(--secondary) / 0.4);
+  }
+
+  /* Theme Toggle */
+  .theme-toggle {
+    @apply relative w-14 h-7 rounded-full bg-muted transition-colors duration-300 cursor-pointer;
+  }
+
+  .theme-toggle::after {
+    content: '';
+    @apply absolute top-1 left-1 w-5 h-5 rounded-full bg-primary transition-transform duration-300;
+  }
+
+  .dark .theme-toggle::after {
+    @apply translate-x-7;
+  }
+}
+
+/* Leaflet Map Overrides */
+.leaflet-container {
+  @apply rounded-xl font-sans;
+  z-index: 1;
+}
+
+.leaflet-popup-content-wrapper {
+  @apply rounded-lg shadow-lg;
+}
+
+.leaflet-popup-content {
+  @apply m-0 p-0;
+}
+
+/* Marker tooltip styles */
+.sfh-marker-tooltip {
+  @apply rounded-lg shadow-lg border border-border/50;
+  background: hsl(var(--card)) !important;
+  color: hsl(var(--card-foreground)) !important;
+  padding: 10px 12px !important;
+}
+
+.sfh-marker-tooltip::before {
+  border-top-color: hsl(var(--card)) !important;
+}
+
+/* Cluster overrides */
+.custom-cluster-icon {
+  background: transparent !important;
+}
+
+.marker-cluster-small,
+.marker-cluster-medium,
+.marker-cluster-large {
+  background: transparent !important;
+}
+
+.marker-cluster div {
+  background: transparent !important;
+}
+
+/* Custom Scrollbar - SFH themed */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-muted/50 rounded-full;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-primary/20 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-primary/30;
+}
+
+/* Focus States */
+*:focus-visible {
+  @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.4s ease-out forwards;
+}
+
+.animate-slide-in {
+  animation: slideIn 0.3s ease-out forwards;
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, transparent 0%, hsl(var(--primary) / 0.1) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
