@@ -54,6 +54,12 @@ enum VolunteerOpsStatus {
   ON_LEAVE
 }
 
+enum AnnouncementPriority {
+  URGENT
+  NORMAL
+  INFO
+}
+
 enum FieldReportStatus {
   PENDING
   APPROVED
@@ -107,6 +113,7 @@ model User {
   volunteerOpsStatus   VolunteerOpsStatus   @default(AVAILABLE)
   yearsOfExperience    Int                  @default(0)
   volunteerDistrict    String?
+  phone                String?
   bio                  String?
   programsCreated      Program[]            @relation("ProgramCreator")
   managedPrograms      Program[]            @relation("ProgramFieldManager")
@@ -124,6 +131,7 @@ model User {
   auditLogs            AuditLog[]
   scheduledActivitiesCreated ScheduledActivity[] @relation("ScheduledActivityCreator")
   scheduledActivityAssignments ScheduledActivityVolunteer[] @relation("ScheduledActivityVolunteer")
+  announcementsCreated Announcement[] @relation("AnnouncementCreator")
 }
 
 model Permission {
@@ -206,8 +214,8 @@ model FieldReport {
   programId          String
   taskId             String?
   location           String
-  latitude           Float
-  longitude          Float
+  latitude           Float?
+  longitude          Float?
   beneficiariesCount Int
   notes              String
   activityOutcome    String?
@@ -381,6 +389,19 @@ model ScheduledActivity {
   @@index([date])
   @@index([programId])
   @@index([createdById])
+}
+
+model Announcement {
+  id        String               @id @default(uuid())
+  title     String
+  message   String
+  priority  AnnouncementPriority @default(NORMAL)
+  createdById String
+  createdBy User                 @relation("AnnouncementCreator", fields: [createdById], references: [id])
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+
+  @@index([createdAt])
 }
 
 model ScheduledActivityVolunteer {

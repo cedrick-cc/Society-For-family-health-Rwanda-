@@ -24,6 +24,7 @@ import { cn } from '@/lib/utils';
 import { getProgram } from '@/services/api';
 import { PROGRAM_TYPE_LABELS, labelsForResourceKeys } from '@/lib/programResources';
 import type { ProgramTypeKey } from '@/lib/programResources';
+import { computeProgramProgress } from '@/lib/programProgress';
 
 type ApiVolunteer = { id: string; name: string; email?: string };
 type ApiReport = {
@@ -126,6 +127,9 @@ const ProgramDetailsModal: React.FC<ProgramDetailsModalProps> = ({ open, onOpenC
   }, [open, programId]);
 
   const st = p ? statusUi(p.status) : 'planned';
+  const progressPct = p
+    ? computeProgramProgress(st, p.startDate, p.endDate, p.progress)
+    : 0;
   const assigned = p?.programVolunteers?.length ?? 0;
   const needed = p?.volunteersNeeded ?? 0;
   const hr = Array.isArray(p?.healthResources) ? p!.healthResources! : [];
@@ -188,9 +192,9 @@ const ProgramDetailsModal: React.FC<ProgramDetailsModalProps> = ({ open, onOpenC
               <div>
                 <div className="flex justify-between text-xs mb-1">
                   <span className="text-muted-foreground">Progress</span>
-                  <span className="font-semibold">{Math.min(100, p.progress ?? 0)}%</span>
+                  <span className="font-semibold">{progressPct}%</span>
                 </div>
-                <Progress value={Math.min(100, p.progress ?? 0)} className="h-2" />
+                <Progress value={progressPct} className="h-2" />
               </div>
 
               <div className="grid grid-cols-2 gap-3">

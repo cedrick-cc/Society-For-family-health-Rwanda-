@@ -44,7 +44,7 @@ const GenerateReportModal: React.FC<GenerateReportModalProps> = ({ open, onOpenC
     }
     setLoading(true);
     try {
-      await downloadExport(selected.entity, format, period, selected.value);
+      await downloadExport(selected.entity, format, period, selected.value, month, year);
       toast.success(`${selected.label} downloaded.`);
       onOpenChange(false);
     } catch (e) {

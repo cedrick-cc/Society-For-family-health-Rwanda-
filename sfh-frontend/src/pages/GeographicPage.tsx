@@ -532,7 +532,7 @@ const GeographicPage: React.FC = () => {
                     </Button>
                   </div>
                 </CardHeader>
-                <CardContent className="space-y-4 max-h-[min(70vh,520px)] overflow-y-auto overscroll-contain">
+                <CardContent className="space-y-4 max-h-[min(75vh,560px)] overflow-y-auto overscroll-y-contain pr-1 -mr-1">
                   <div className="space-y-2 text-sm">
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <MapPin className="w-4 h-4" />
@@ -551,15 +551,13 @@ const GeographicPage: React.FC = () => {
                     </div>
                   </div>
 
-                  {selectedLocation.status !== 'planned' && (
-                    <div>
-                      <div className="flex items-center justify-between text-sm mb-2">
-                        <span className="text-muted-foreground">Coverage</span>
-                        <span className="font-semibold">{selectedLocation.coverage}%</span>
-                      </div>
-                      <Progress value={selectedLocation.coverage} className="h-2" />
+                  <div>
+                    <div className="flex items-center justify-between text-sm mb-2">
+                      <span className="text-muted-foreground">Progress</span>
+                      <span className="font-semibold">{selectedLocation.coverage}%</span>
                     </div>
-                  )}
+                    <Progress value={selectedLocation.coverage} className="h-2" />
+                  </div>
 
                   <div className="grid grid-cols-2 gap-3 pt-3 border-t">
                     <div className="text-center p-2 rounded-lg bg-muted/50">

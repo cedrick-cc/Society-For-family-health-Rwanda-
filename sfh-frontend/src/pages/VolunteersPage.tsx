@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { fetchVolunteers } from '@/lib/api';
+import { deactivateVolunteer } from '@/services/api';
 import { EmptyState } from '@/components/ui/empty-state';
 import { motion } from 'framer-motion';
 import {
@@ -13,11 +14,8 @@ import {
   Eye,
   Edit,
   UserX,
-  Star,
   Award,
-  Calendar,
   CheckCircle2,
-  Clock,
   Users,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -38,10 +36,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Progress } from '@/components/ui/progress';
-import { cn } from '@/lib/utils';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import AddVolunteerModal from '@/components/modals/AddVolunteerModal';
-import { toast } from '@/hooks/use-toast';
+import VolunteerProfileModal from '@/components/modals/VolunteerProfileModal';
+import EditVolunteerModal from '@/components/modals/EditVolunteerModal';
+import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
 
 interface Volunteer {
   id: number | string;
@@ -56,9 +65,7 @@ interface Volunteer {
   certifications: string[];
   joinDate: string;
   programsCompleted: number;
-  hoursContributed: number;
   beneficiariesServed: number;
-  rating: number;
   currentProgram?: string;
   volunteerOpsStatus?: string;
   assignedProgramsCount?: number;
@@ -67,12 +74,18 @@ interface Volunteer {
 }
 
 const VolunteersPage: React.FC = () => {
+  const { user } = useAuth();
+  const canManage = user?.role === 'admin' || user?.role === 'coordinator';
   const [volunteers, setVolunteers] = useState<Volunteer[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
   const [showAddVolunteer, setShowAddVolunteer] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [profileId, setProfileId] = useState<string | null>(null);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [editVolunteer, setEditVolunteer] = useState<Volunteer | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [deactivateTarget, setDeactivateTarget] = useState<Volunteer | null>(null);
 
   const loadVolunteers = () => {
     setLoading(true);
@@ -85,6 +98,11 @@ const VolunteersPage: React.FC = () => {
   useEffect(() => {
     loadVolunteers();
   }, []);
+
+  const openProfile = (v: Volunteer) => {
+    setProfileId(String(v.id));
+    setProfileOpen(true);
+  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -114,17 +132,23 @@ const VolunteersPage: React.FC = () => {
   const stats = {
     total: volunteers.length,
     active: volunteers.filter((v) => v.status === 'active').length,
-    totalHours: volunteers.reduce((acc, v) => acc + v.hoursContributed, 0),
-    avgRating: volunteers.length ? (volunteers.reduce((acc, v) => acc + v.rating, 0) / volunteers.length).toFixed(1) : '0.0',
+    totalServed: volunteers.reduce((acc, v) => acc + v.beneficiariesServed, 0),
+  };
+
+  const confirmDeactivate = async () => {
+    if (!deactivateTarget) return;
+    try {
+      await deactivateVolunteer(String(deactivateTarget.id));
+      toast.success(`${deactivateTarget.name} has been deactivated.`);
+      setDeactivateTarget(null);
+      loadVolunteers();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Deactivate failed.');
+    }
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="space-y-6"
-    >
-      {/* Header */}
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-display font-bold">Volunteer Management</h1>
@@ -139,9 +163,36 @@ const VolunteersPage: React.FC = () => {
       </div>
 
       <AddVolunteerModal open={showAddVolunteer} onOpenChange={setShowAddVolunteer} />
+      <VolunteerProfileModal
+        open={profileOpen}
+        onOpenChange={setProfileOpen}
+        volunteerId={profileId}
+      />
+      <EditVolunteerModal
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        volunteer={editVolunteer}
+        onSaved={loadVolunteers}
+      />
 
-      {/* Stats Overview */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <AlertDialog open={!!deactivateTarget} onOpenChange={(o) => !o && setDeactivateTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Deactivate volunteer?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deactivateTarget?.name} will be set to inactive and will no longer be assignable to programs.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeactivate} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Deactivate
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         <Card className="sfh-card p-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -164,31 +215,19 @@ const VolunteersPage: React.FC = () => {
             </div>
           </div>
         </Card>
-        <Card className="sfh-card p-4">
+        <Card className="sfh-card p-4 col-span-2 md:col-span-1">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-info/10 flex items-center justify-center">
-              <Clock className="w-5 h-5 text-info" />
+            <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center">
+              <Users className="w-5 h-5 text-accent" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Total Hours</p>
-              <p className="text-2xl font-bold text-primary">{stats.totalHours.toLocaleString()}</p>
-            </div>
-          </div>
-        </Card>
-        <Card className="sfh-card p-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-warning/10 flex items-center justify-center">
-              <Star className="w-5 h-5 text-warning fill-warning" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Avg. Rating</p>
-              <p className="text-2xl font-bold">{stats.avgRating}</p>
+              <p className="text-sm text-muted-foreground">Total Served</p>
+              <p className="text-2xl font-bold text-primary">{stats.totalServed.toLocaleString()}</p>
             </div>
           </div>
         </Card>
       </div>
 
-      {/* Filters */}
       <Card className="sfh-card">
         <CardContent className="p-4">
           <div className="flex flex-col sm:flex-row gap-4">
@@ -217,7 +256,6 @@ const VolunteersPage: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Volunteers Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
         {filteredVolunteers.map((volunteer, index) => (
           <motion.div
@@ -233,22 +271,12 @@ const VolunteersPage: React.FC = () => {
                     <Avatar className="h-12 w-12">
                       <AvatarImage src={volunteer.avatar} />
                       <AvatarFallback className="bg-primary/10 text-primary font-semibold">
-                        {volunteer.name
-                          .split(' ')
-                          .map((n) => n[0])
-                          .join('')
-                          .slice(0, 2)}
+                        {volunteer.name.split(' ').map((n) => n[0]).join('').slice(0, 2)}
                       </AvatarFallback>
                     </Avatar>
                     <div>
                       <CardTitle className="text-base font-semibold">{volunteer.name}</CardTitle>
-                      <div className="flex items-center gap-2 mt-1">
-                        {getStatusBadge(volunteer.status)}
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <Star className="w-3 h-3 text-warning fill-warning" />
-                          {volunteer.rating}
-                        </div>
-                      </div>
+                      <div className="mt-1">{getStatusBadge(volunteer.status)}</div>
                     </div>
                   </div>
                   <DropdownMenu>
@@ -258,24 +286,35 @@ const VolunteersPage: React.FC = () => {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => toast({ title: "View Profile", description: `Viewing profile for ${volunteer.name}` })}>
+                      <DropdownMenuItem onClick={() => openProfile(volunteer)}>
                         <Eye className="w-4 h-4 mr-2" />
                         View Profile
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => toast({ title: "Edit Details", description: `Editing details for ${volunteer.name}` })}>
-                        <Edit className="w-4 h-4 mr-2" />
-                        Edit Details
-                      </DropdownMenuItem>
-                      <DropdownMenuItem className="text-destructive" onClick={() => toast({ title: "Deactivate", description: `${volunteer.name} would be deactivated`, variant: "destructive" })}>
-                        <UserX className="w-4 h-4 mr-2" />
-                        Deactivate
-                      </DropdownMenuItem>
+                      {canManage && (
+                        <DropdownMenuItem
+                          onClick={() => {
+                            setEditVolunteer(volunteer);
+                            setEditOpen(true);
+                          }}
+                        >
+                          <Edit className="w-4 h-4 mr-2" />
+                          Edit Details
+                        </DropdownMenuItem>
+                      )}
+                      {canManage && volunteer.status !== 'inactive' && (
+                        <DropdownMenuItem
+                          className="text-destructive"
+                          onClick={() => setDeactivateTarget(volunteer)}
+                        >
+                          <UserX className="w-4 h-4 mr-2" />
+                          Deactivate
+                        </DropdownMenuItem>
+                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* Contact Info */}
                 <div className="space-y-2 text-sm">
                   <div className="flex items-center gap-2 text-muted-foreground">
                     <Mail className="w-4 h-4" />
@@ -293,14 +332,16 @@ const VolunteersPage: React.FC = () => {
 
                 {volunteer.volunteerOpsStatus && (
                   <p className="text-xs text-muted-foreground">
-                    Ops status: <span className="font-medium capitalize">{volunteer.volunteerOpsStatus.replace(/_/g, ' ').toLowerCase()}</span>
+                    Ops status:{' '}
+                    <span className="font-medium capitalize">
+                      {volunteer.volunteerOpsStatus.replace(/_/g, ' ').toLowerCase()}
+                    </span>
                     {volunteer.assignedProgramsCount != null && (
                       <> · {volunteer.assignedProgramsCount} program(s)</>
                     )}
                   </p>
                 )}
 
-                {/* Current Assignment */}
                 {volunteer.currentProgram && (
                   <div className="p-3 rounded-lg bg-primary/5 border border-primary/10">
                     <p className="text-xs text-muted-foreground">Currently assigned to</p>
@@ -308,14 +349,6 @@ const VolunteersPage: React.FC = () => {
                   </div>
                 )}
 
-                {(volunteer.taskSummary || volunteer.activitySummary) && (
-                  <div className="text-xs text-muted-foreground space-y-1">
-                    {volunteer.taskSummary && <p>Tasks: {volunteer.taskSummary}</p>}
-                    {volunteer.activitySummary && <p>Activity: {volunteer.activitySummary}</p>}
-                  </div>
-                )}
-
-                {/* Skills */}
                 <div>
                   <p className="text-xs text-muted-foreground mb-2">Skills</p>
                   <div className="flex flex-wrap gap-1">
@@ -332,7 +365,6 @@ const VolunteersPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Certifications */}
                 <div>
                   <p className="text-xs text-muted-foreground mb-2">Certifications</p>
                   <div className="flex flex-wrap gap-1">
@@ -348,15 +380,10 @@ const VolunteersPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Stats */}
-                <div className="grid grid-cols-3 gap-2 pt-4 border-t">
+                <div className="grid grid-cols-2 gap-2 pt-4 border-t">
                   <div className="text-center">
                     <p className="text-lg font-semibold">{volunteer.programsCompleted}</p>
                     <p className="text-xs text-muted-foreground">Programs</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-lg font-semibold">{volunteer.hoursContributed}</p>
-                    <p className="text-xs text-muted-foreground">Hours</p>
                   </div>
                   <div className="text-center">
                     <p className="text-lg font-semibold">{volunteer.beneficiariesServed}</p>
@@ -364,12 +391,7 @@ const VolunteersPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Action Button */}
-                <Button 
-                  variant="outline" 
-                  className="w-full"
-                  onClick={() => toast({ title: "View Full Profile", description: `Viewing full profile for ${volunteer.name}` })}
-                >
+                <Button variant="outline" className="w-full" onClick={() => openProfile(volunteer)}>
                   View Full Profile
                 </Button>
               </CardContent>

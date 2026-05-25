@@ -26,6 +26,7 @@ import CalendarModal from '@/components/modals/CalendarModal';
 import SubmitFieldReportModal from '@/components/modals/SubmitFieldReportModal';
 import ViewFieldReportModal from '@/components/modals/ViewFieldReportModal';
 import RecentFieldReports from '@/components/volunteer/RecentFieldReports';
+import AnnouncementsCard from '@/components/AnnouncementsCard';
 import { type FieldReport } from '@/types/fieldReport';
 import { type Program, type Task, mapApiFieldReportToUI } from '@/lib/api';
 import { getVolunteerDashboard, updateTask } from '@/services/api';
@@ -35,9 +36,6 @@ import { toast } from 'sonner';
 
 interface RecentBeneficiary {
   name: string; service: string; date: string; status: 'completed' | 'follow-up';
-}
-interface Announcement {
-  title: string; date: string; urgent: boolean;
 }
 interface Badge { name: string; icon: string; earned: boolean; }
 
@@ -66,7 +64,6 @@ const VolunteerDashboard: React.FC = () => {
   const [myPrograms, setMyPrograms] = useState<Program[]>([]);
   const [fieldReports, setFieldReports] = useState<FieldReport[]>([]);
   const [recentBeneficiaries] = useState<RecentBeneficiary[]>([]);
-  const [announcements] = useState<Announcement[]>([]);
   const [badges] = useState<Badge[]>([]);
   const [taskBusyId, setTaskBusyId] = useState<string | null>(null);
   const [completeOpen, setCompleteOpen] = useState(false);
@@ -78,8 +75,6 @@ const VolunteerDashboard: React.FC = () => {
   const beneficiariesThisMonth = myPrograms.reduce((acc, p) => acc + (p.beneficiaries || 0), 0);
   const daysActive = 0;
   const monthlyGoal = 100;
-  const rating = 0;
-
   const reloadDashboard = useCallback(() => {
     getVolunteerDashboard()
       .then((d: { programs?: ApiProgram[]; tasks?: unknown[]; reports?: unknown[] }) => {
@@ -182,8 +177,8 @@ const VolunteerDashboard: React.FC = () => {
                   </div>
                   <div className="w-px h-8 bg-white/30" />
                   <div className="text-center">
-                    <p className="text-2xl font-bold">{rating > 0 ? rating.toFixed(1) : '—'}</p>
-                    <p className="text-xs text-white/70">Rating</p>
+                    <p className="text-2xl font-bold">{fieldReports.length}</p>
+                    <p className="text-xs text-white/70">Reports</p>
                   </div>
                 </div>
               </div>
@@ -436,29 +431,7 @@ const VolunteerDashboard: React.FC = () => {
 
         {/* Announcements + Badges + Quick Actions */}
         <motion.div variants={item} className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card className="sfh-card">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base font-semibold flex items-center gap-2">
-                <Megaphone className="w-4 h-4 text-accent" /> Announcements
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {announcements.length === 0 ? (
-                <EmptyState icon={Megaphone} title="No announcements" compact />
-              ) : (
-                announcements.map((a, i) => (
-                  <div key={i} className="flex items-start gap-3 p-3 rounded-xl bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer">
-                    <div className={cn('w-2 h-2 rounded-full mt-1.5 flex-shrink-0', a.urgent ? 'bg-destructive' : 'bg-muted-foreground')} />
-                    <div>
-                      <p className="text-sm font-medium leading-tight">{a.title}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">{a.date}</p>
-                    </div>
-                    {a.urgent && <span className="ml-auto text-xs text-destructive flex-shrink-0 font-medium">!</span>}
-                  </div>
-                ))
-              )}
-            </CardContent>
-          </Card>
+          <AnnouncementsCard compact />
 
           <Card className="sfh-card">
             <CardHeader className="pb-3">

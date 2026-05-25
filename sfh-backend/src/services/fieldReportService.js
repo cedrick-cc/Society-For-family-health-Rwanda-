@@ -52,10 +52,23 @@ async function submitReport({
     }
   }
 
-  const lat = Number(latitude);
-  const lng = Number(longitude);
-  if (Number.isNaN(lat) || Number.isNaN(lng)) {
-    throw new Error('latitude and longitude must be valid numbers.');
+  const loc = String(location || '').trim();
+  if (!loc) {
+    throw new Error('location description is required.');
+  }
+
+  let lat = null;
+  let lng = null;
+  if (latitude !== undefined && latitude !== null && String(latitude).trim() !== '') {
+    lat = Number(latitude);
+    if (Number.isNaN(lat)) throw new Error('latitude must be a valid number.');
+  }
+  if (longitude !== undefined && longitude !== null && String(longitude).trim() !== '') {
+    lng = Number(longitude);
+    if (Number.isNaN(lng)) throw new Error('longitude must be a valid number.');
+  }
+  if ((lat == null) !== (lng == null)) {
+    throw new Error('Provide both latitude and longitude, or leave both empty.');
   }
 
   const report = await prisma.fieldReport.create({
@@ -63,7 +76,7 @@ async function submitReport({
       volunteerId,
       programId,
       taskId: taskId || null,
-      location: String(location || '').trim(),
+      location: loc,
       latitude: lat,
       longitude: lng,
       beneficiariesCount: Math.max(0, Number(beneficiariesCount) || 0),

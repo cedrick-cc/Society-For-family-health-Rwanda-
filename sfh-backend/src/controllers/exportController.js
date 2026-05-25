@@ -41,7 +41,11 @@ const exportEntity = async (req, res) => {
       }
     } else {
       const reportType = req.query.reportType || null;
-      result = await exportService.exportData(entity, format, reportType);
+      result = await exportService.exportData(entity, format, reportType, {
+        period: req.query.period,
+        month: req.query.month,
+        year: req.query.year,
+      });
     }
 
     res.setHeader('Content-Type', result.contentType);

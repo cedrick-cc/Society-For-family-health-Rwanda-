@@ -50,9 +50,7 @@ export interface Volunteer {
   certifications: string[];
   joinDate: string;
   programsCompleted: number;
-  hoursContributed: number;
   beneficiariesServed: number;
-  rating: number;
   currentProgram?: string;
 }
 
@@ -236,7 +234,7 @@ export async function fetchVolunteers(): Promise<Volunteer[]> {
         id: String(v.id),
         name: String(v.name || ''),
         email: String(v.email || ''),
-        phone: '—',
+        phone: v.phone ? String(v.phone) : '—',
         avatar: v.profileImage ? String(v.profileImage) : undefined,
         location: String(v.volunteerDistrict || 'Rwanda'),
         district: String(v.volunteerDistrict || '—'),
@@ -244,10 +242,8 @@ export async function fetchVolunteers(): Promise<Volunteer[]> {
         skills: Array.isArray(v.skills) ? (v.skills as string[]) : [],
         certifications: Array.isArray(v.certifications) ? (v.certifications as string[]) : [],
         joinDate: v.joinDate ? new Date(String(v.joinDate)).toLocaleDateString() : '',
-        programsCompleted: Number(v.programsCompleted) || 0,
-        hoursContributed: Number(v.tasksCompleted) || 0,
-        beneficiariesServed: Number(v.beneficiariesRegistered) || 0,
-        rating: 4.5,
+        programsCompleted: Number(v.programsParticipated ?? v.programsCompleted) || 0,
+        beneficiariesServed: Number(v.beneficiariesServed) || 0,
         currentProgram: v.currentProgram ? String(v.currentProgram) : undefined,
         volunteerOpsStatus: String(v.volunteerOpsStatus || ''),
         assignedProgramsCount: Number(v.assignedProgramsCount) || 0,

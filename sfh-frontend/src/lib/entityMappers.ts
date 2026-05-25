@@ -1,7 +1,8 @@
 import type { ProgramTypeKey } from '@/lib/programResources';
 import { PROGRAM_TYPE_LABELS } from '@/lib/programResources';
+import { computeProgramProgress, type ProgramStatusUI } from '@/lib/programProgress';
 
-export type ProgramStatusUI = 'planned' | 'ongoing' | 'completed';
+export type { ProgramStatusUI } from '@/lib/programProgress';
 
 export type ProgramUI = {
   id: string;
@@ -98,18 +99,7 @@ function programStatusFromApi(status: string): ProgramStatusUI {
 
 export function mapApiProgramToUI(p: ApiProgram): ProgramUI {
   const status = programStatusFromApi(p.status);
-  let progress = Math.min(100, Math.max(0, Number(p.progress) || 0));
-  const start = new Date(p.startDate).getTime();
-  const end = new Date(p.endDate).getTime();
-  const now = Date.now();
-
-  if (status === 'completed') {
-    progress = Math.max(progress, 100);
-  } else if (status === 'ongoing' && end > start && !Number(p.progress)) {
-    progress = Math.max(0, Math.min(100, Math.round(((now - start) / (end - start)) * 100)));
-  } else if (status === 'planned' && !Number(p.progress)) {
-    progress = Math.min(progress, 15);
-  }
+  const progress = computeProgramProgress(status, p.startDate, p.endDate, p.progress);
 
   const sector = p.sector?.trim() || '';
   const location = [p.district, sector].filter(Boolean).join(', ');

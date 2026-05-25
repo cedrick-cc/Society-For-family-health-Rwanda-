@@ -39,6 +39,7 @@ import {
 } from '@/lib/api';
 import { reviewFieldReport } from '@/services/api';
 import { toast } from 'sonner';
+import AnnouncementsCard from '@/components/AnnouncementsCard';
 
 interface PendingFieldReport extends FieldReport {
   volunteerName: string;
@@ -279,15 +280,15 @@ const CoordinatorDashboard: React.FC = () => {
             </CardContent>
           </Card>
 
-          <Card className="sfh-card">
-            <CardHeader className="pb-2">
+          <Card className="sfh-card flex flex-col min-h-[420px] max-h-[min(85vh,720px)]">
+            <CardHeader className="pb-2 shrink-0">
               <CardTitle className="text-base font-semibold flex items-center gap-2">
                 <ClipboardList className="w-4 h-4 text-warning" />
                 Reports Awaiting Review
               </CardTitle>
               <p className="text-xs text-muted-foreground mt-1">Review and approve field reports submitted by volunteers.</p>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain space-y-3 pr-1">
               {pendingReports.length === 0 ? (
                 <EmptyState icon={CheckCircle2} title="No pending reports" description="Reports submitted by volunteers will appear here." compact />
               ) : (
@@ -305,27 +306,27 @@ const CoordinatorDashboard: React.FC = () => {
                         <p className="flex items-center gap-1"><HeartHandshake className="w-3 h-3" /> {r.beneficiariesServed} beneficiaries</p>
                       )}
                     </div>
-                    <div className="flex gap-2 mt-2">
-                      <button onClick={() => handleApprove(r.id)} className="flex-1 text-xs py-1.5 rounded-lg bg-success/10 text-success font-medium hover:bg-success/20 transition-colors flex items-center justify-center gap-1">
+                    <div className="flex gap-2 mt-2 flex-wrap">
+                      <button onClick={() => handleApprove(r.id)} className="flex-1 min-w-[80px] text-xs py-1.5 rounded-lg bg-success/10 text-success font-medium hover:bg-success/20 transition-colors flex items-center justify-center gap-1">
                         <Check className="w-3 h-3" /> Approve
                       </button>
-                      <button onClick={() => openReject(r.id)} className="flex-1 text-xs py-1.5 rounded-lg bg-destructive/10 text-destructive font-medium hover:bg-destructive/20 transition-colors flex items-center justify-center gap-1">
+                      <button onClick={() => openReject(r.id)} className="flex-1 min-w-[80px] text-xs py-1.5 rounded-lg bg-destructive/10 text-destructive font-medium hover:bg-destructive/20 transition-colors flex items-center justify-center gap-1">
                         <X className="w-3 h-3" /> Reject
                       </button>
-                      <button onClick={() => setViewReport(r)} className="text-xs py-1.5 px-2 rounded-lg bg-muted text-muted-foreground font-medium hover:bg-muted/80 transition-colors flex items-center gap-1">
-                        <Eye className="w-3 h-3" />
+                      <button onClick={() => setViewReport(r)} className="text-xs py-1.5 px-3 rounded-lg bg-muted text-muted-foreground font-medium hover:bg-muted/80 transition-colors flex items-center gap-1">
+                        <Eye className="w-3 h-3" /> View
                       </button>
                     </div>
                   </div>
                 ))
               )}
             </CardContent>
-            <CardContent className="pt-0 border-t">
+            <CardContent className="pt-3 border-t shrink-0">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Recent submissions</p>
               {recentReports.length === 0 ? (
                 <p className="text-xs text-muted-foreground">No recent activity.</p>
               ) : (
-                <ul className="space-y-2 max-h-48 overflow-y-auto">
+                <ul className="space-y-2 max-h-32 overflow-y-auto">
                   {recentReports.map((r) => (
                     <li key={r.id} className="text-xs text-muted-foreground flex justify-between gap-2">
                       <span className="truncate">{r.volunteerName} — {r.program}</span>
@@ -336,6 +337,10 @@ const CoordinatorDashboard: React.FC = () => {
               )}
             </CardContent>
           </Card>
+        </motion.div>
+
+        <motion.div variants={item}>
+          <AnnouncementsCard showLink />
         </motion.div>
 
         <motion.div variants={item} className="grid grid-cols-1 lg:grid-cols-3 gap-6">

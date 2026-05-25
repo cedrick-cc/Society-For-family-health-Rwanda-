@@ -83,7 +83,7 @@ const SubmitFieldReportModal: React.FC<SubmitFieldReportModalProps> = ({
       },
       () => {
         setGpsLoading(false);
-        toast.error('Unable to capture location. Please enter manually.');
+        toast.warning('Could not capture GPS. You can still submit with location description only.');
       },
       { enableHighAccuracy: true, timeout: 10000 }
     );
@@ -111,19 +111,21 @@ const SubmitFieldReportModal: React.FC<SubmitFieldReportModalProps> = ({
       toast.error('Select activity status.');
       return;
     }
-    const lat = parseFloat(latitude);
-    const lng = parseFloat(longitude);
-    if (Number.isNaN(lat) || Number.isNaN(lng)) {
-      toast.error('Enter valid GPS coordinates or use Capture GPS.');
+    if (!location.trim()) {
+      toast.error('Location description is required.');
       return;
     }
 
     const fd = new FormData();
     fd.append('programId', programId);
     if (selectedTaskId) fd.append('taskId', selectedTaskId);
-    fd.append('location', location);
-    fd.append('latitude', String(lat));
-    fd.append('longitude', String(lng));
+    fd.append('location', location.trim());
+    const lat = parseFloat(latitude);
+    const lng = parseFloat(longitude);
+    if (!Number.isNaN(lat) && !Number.isNaN(lng)) {
+      fd.append('latitude', String(lat));
+      fd.append('longitude', String(lng));
+    }
     fd.append('beneficiariesCount', String(parseInt(beneficiariesServed, 10) || 0));
     fd.append('notes', description);
     fd.append('activityOutcome', activityOutcome);
@@ -202,12 +204,12 @@ const SubmitFieldReportModal: React.FC<SubmitFieldReportModalProps> = ({
             </div>
             <div className="flex items-end gap-3 flex-wrap">
               <div className="space-y-2 flex-1 min-w-[120px]">
-                <Label>Latitude *</Label>
-                <Input value={latitude} onChange={(e) => setLatitude(e.target.value)} placeholder="-1.9536" required />
+                <Label>Latitude (optional)</Label>
+                <Input value={latitude} onChange={(e) => setLatitude(e.target.value)} placeholder="-1.9536" />
               </div>
               <div className="space-y-2 flex-1 min-w-[120px]">
-                <Label>Longitude *</Label>
-                <Input value={longitude} onChange={(e) => setLongitude(e.target.value)} placeholder="30.0946" required />
+                <Label>Longitude (optional)</Label>
+                <Input value={longitude} onChange={(e) => setLongitude(e.target.value)} placeholder="30.0946" />
               </div>
               <Button type="button" variant="outline" size="sm" className="h-10 gap-1.5" onClick={captureGPS} disabled={gpsLoading}>
                 {gpsLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <MapPin className="w-4 h-4" />}

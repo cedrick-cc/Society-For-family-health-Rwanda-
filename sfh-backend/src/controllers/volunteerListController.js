@@ -13,4 +13,34 @@ const listVolunteers = async (req, res) => {
   }
 };
 
-module.exports = { listVolunteers };
+const getVolunteer = async (req, res) => {
+  try {
+    const row = await volunteerListService.getVolunteerDetail(req.params.id);
+    return res.status(200).json(row);
+  } catch (error) {
+    const code = error.statusCode || 500;
+    return res.status(code).json({ message: error.message || 'Failed to load volunteer.' });
+  }
+};
+
+const updateVolunteer = async (req, res) => {
+  try {
+    const row = await volunteerListService.updateVolunteer(req.params.id, req.body);
+    return res.status(200).json(row);
+  } catch (error) {
+    const code = error.statusCode || 400;
+    return res.status(code).json({ message: error.message || 'Update failed.' });
+  }
+};
+
+const deactivateVolunteer = async (req, res) => {
+  try {
+    const row = await volunteerListService.deactivateVolunteer(req.params.id);
+    return res.status(200).json(row);
+  } catch (error) {
+    const code = error.statusCode || 400;
+    return res.status(code).json({ message: error.message || 'Deactivate failed.' });
+  }
+};
+
+module.exports = { listVolunteers, getVolunteer, updateVolunteer, deactivateVolunteer };

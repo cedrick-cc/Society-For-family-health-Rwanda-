@@ -23,6 +23,7 @@ const auditRoutes = require('./routes/auditRoutes');
 const exportRoutes = require('./routes/exportRoutes');
 const volunteerListRoutes = require('./routes/volunteerListRoutes');
 const scheduledActivityRoutes = require('./routes/scheduledActivityRoutes');
+const announcementRoutes = require('./routes/announcementRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -52,6 +53,7 @@ app.use('/api/audit-logs', auditRoutes);
 app.use('/api/exports', exportRoutes);
 app.use('/api/volunteers', volunteerListRoutes);
 app.use('/api/scheduled-activities', scheduledActivityRoutes);
+app.use('/api/announcements', announcementRoutes);
 
 app.get('/', (req, res) => {
   res.send('SFH OMS Backend Running');

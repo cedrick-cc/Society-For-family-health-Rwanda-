@@ -414,6 +414,43 @@ export async function getVolunteersList(params = {}) {
   return apiRequest(`/volunteers${query ? `?${query}` : ''}`);
 }
 
+export async function getVolunteerDetail(id) {
+  return apiRequest(`/volunteers/${id}`);
+}
+
+export async function updateVolunteer(id, payload) {
+  return apiRequest(`/volunteers/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deactivateVolunteer(id) {
+  return apiRequest(`/volunteers/${id}/deactivate`, { method: 'PATCH' });
+}
+
+export async function getAnnouncements() {
+  return apiRequest('/announcements');
+}
+
+export async function createAnnouncement(payload) {
+  return apiRequest('/announcements', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateAnnouncement(id, payload) {
+  return apiRequest(`/announcements/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deleteAnnouncement(id) {
+  return apiRequest(`/announcements/${id}`, { method: 'DELETE' });
+}
+
 export async function getScheduledActivities() {
   return apiRequest('/scheduled-activities');
 }
@@ -440,11 +477,13 @@ export async function getAuditLogs() {
   return apiRequest('/audit-logs');
 }
 
-export async function downloadExport(entity, format = 'csv', period, reportType) {
+export async function downloadExport(entity, format = 'csv', period, reportType, month, year) {
   const token = localStorage.getItem('token');
   const qs = new URLSearchParams({ format });
   if (period) qs.set('period', period);
   if (reportType) qs.set('reportType', reportType);
+  if (month !== undefined && month !== null && month !== '') qs.set('month', String(month));
+  if (year !== undefined && year !== null && year !== '') qs.set('year', String(year));
   const response = await fetch(`${API_BASE_URL}/exports/${entity}?${qs}`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
