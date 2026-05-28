@@ -32,7 +32,7 @@ const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex relative overflow-hidden" data-theme="light">
+    <div className="min-h-screen lg:h-screen flex relative overflow-y-auto lg:overflow-hidden" data-theme="light">
       
       {/* Full Background with Image and Overlay */}
       <div className="absolute inset-0">
@@ -61,17 +61,17 @@ const LoginPage: React.FC = () => {
       </div>
       
       {/* Content Layer */}
-      <div className="relative z-10 w-full flex flex-col lg:flex-row min-h-screen">
+      <div className="relative z-10 w-full flex flex-col lg:flex-row min-h-screen lg:h-full">
         {/* Left Panel - Branding & Message */}
-        <div className="w-full lg:w-3/5 flex flex-col justify-center p-8 lg:p-16 xl:p-24">
+        <div className="w-full lg:w-3/5 flex flex-col justify-start p-4 sm:p-6 lg:p-10 xl:p-14 lg:justify-center">
           {/* Logo */}
           <motion.div 
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
-            className="mb-8 lg:mb-12"
+            className="mb-3 sm:mb-5 lg:mb-6"
           >
-            <div className="w-52 h-52 sm:w-60 sm:h-60 lg:w-72 lg:h-72">
+            <div className="w-28 h-28 sm:w-36 sm:h-36 lg:w-48 lg:h-48 xl:w-56 xl:h-56">
               <img src={sfhLogo} alt="SFH Rwanda Logo" className="w-full h-full object-contain" />
             </div>
           </motion.div>
@@ -81,13 +81,13 @@ const LoginPage: React.FC = () => {
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.2 }}
-            className="mb-8"
+            className="mb-3 sm:mb-5 lg:mb-4"
           >
-            <h1 className="text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-display font-bold text-white leading-tight mb-4">
+            <h1 className="text-xl sm:text-2xl md:text-4xl lg:text-5xl xl:text-6xl font-display font-bold text-white leading-tight mb-2 sm:mb-3">
               Empowering<br />
               Community Health.
             </h1>
-            <h2 className="text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-display font-bold text-secondary italic">
+            <h2 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl xl:text-5xl font-display font-bold text-secondary italic">
               Inspiring Change
             </h2>
           </motion.div>
@@ -97,7 +97,7 @@ const LoginPage: React.FC = () => {
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.4 }}
-            className="text-lg lg:text-xl text-white/80 max-w-xl leading-relaxed mb-8 lg:mb-12"
+            className="text-xs sm:text-sm lg:text-base xl:text-lg text-white/80 max-w-xl leading-relaxed mb-2 sm:mb-4 lg:mb-6"
           >
             At SFH, we are driven by a single purpose: empowering communities to live healthier, 
             more fulfilled lives through innovative health solutions, impactful programs, and 
@@ -109,36 +109,36 @@ const LoginPage: React.FC = () => {
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.6 }}
-            className="hidden lg:flex items-center gap-8"
+            className="hidden lg:flex items-center gap-5"
           >
             <div className="text-center">
-              <p className="text-3xl font-bold text-white">500+</p>
-              <p className="text-sm text-white/60">Volunteers</p>
+              <p className="text-2xl font-bold text-white">500+</p>
+              <p className="text-xs text-white/60">Volunteers</p>
             </div>
-            <div className="w-px h-12 bg-white/20" />
+            <div className="w-px h-10 bg-white/20" />
             <div className="text-center">
-              <p className="text-3xl font-bold text-white">30</p>
-              <p className="text-sm text-white/60">Districts</p>
+              <p className="text-2xl font-bold text-white">30</p>
+              <p className="text-xs text-white/60">Districts</p>
             </div>
-            <div className="w-px h-12 bg-white/20" />
+            <div className="w-px h-10 bg-white/20" />
             <div className="text-center">
-              <p className="text-3xl font-bold text-white">100K+</p>
-              <p className="text-sm text-white/60">Lives Impacted</p>
+              <p className="text-2xl font-bold text-white">100K+</p>
+              <p className="text-xs text-white/60">Lives Impacted</p>
             </div>
           </motion.div>
         </div>
         
         {/* Right Panel - Login Form */}
-        <div className="w-full lg:w-2/5 flex items-center justify-center p-6 lg:p-12">
+        <div className="w-full lg:w-2/5 flex items-center justify-start p-3 sm:p-6 lg:p-8 xl:p-10 lg:justify-center">
           <motion.div 
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.5, delay: 0.3 }}
-            className="w-full max-w-md"
+            className="w-full max-w-md flex flex-col"
           >
             {/* Form Card - Dark Glass */}
             <div
-              className="rounded-2xl shadow-2xl p-8 lg:p-10"
+              className="rounded-2xl shadow-2xl p-5 sm:p-6 lg:p-10"
               style={{
                 background: 'rgba(0, 10, 40, 0.72)',
                 backdropFilter: 'blur(24px)',
@@ -147,8 +147,8 @@ const LoginPage: React.FC = () => {
                 boxShadow: '0 8px 40px 0 rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.08)',
               }}
             >
-              <div className="text-center mb-8">
-                <div className="w-44 h-44 sm:w-48 sm:h-48 mx-auto mb-4">
+              <div className="text-center mb-5 sm:mb-6">
+                <div className="w-20 h-20 sm:w-24 sm:h-24 mx-auto mb-3">
                   <img src={sfhLogo} alt="SFH Rwanda Logo" className="w-full h-full object-contain" />
                 </div>
                 <h2 className="text-2xl font-display font-bold text-white mb-2">
@@ -159,9 +159,9 @@ const LoginPage: React.FC = () => {
                 </p>
               </div>
 
-              <form onSubmit={handleSubmit} className="space-y-5">
+              <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
                 {/* Email */}
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <label htmlFor="email" className="text-sm font-medium" style={{ color: 'rgba(255,255,255,0.80)' }}>
                     Email Address
                   </label>
@@ -175,7 +175,7 @@ const LoginPage: React.FC = () => {
                     style={{
                       display: 'flex',
                       width: '100%',
-                      height: '48px',
+                      height: '44px',
                       padding: '0 14px',
                       borderRadius: '8px',
                       background: 'rgba(255,255,255,0.07)',
@@ -191,7 +191,7 @@ const LoginPage: React.FC = () => {
                 </div>
 
                 {/* Password */}
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <label htmlFor="password" className="text-sm font-medium" style={{ color: 'rgba(255,255,255,0.80)' }}>
                     Password
                   </label>
@@ -206,7 +206,7 @@ const LoginPage: React.FC = () => {
                       style={{
                         display: 'flex',
                         width: '100%',
-                        height: '48px',
+                        height: '44px',
                         padding: '0 48px 0 14px',
                         borderRadius: '8px',
                         background: 'rgba(255,255,255,0.07)',
@@ -277,7 +277,7 @@ const LoginPage: React.FC = () => {
               </form>
 
               {/* Signup Link */}
-              <div className="mt-6 text-center">
+              <div className="mt-4 sm:mt-6 text-center">
                 <p className="text-sm" style={{ color: 'rgba(255,255,255,0.55)' }}>
                   Don't have an account?{' '}
                   <Link to="/signup" className="font-semibold hover:underline" style={{ color: 'rgba(57,255,20,0.85)' }}>
@@ -289,7 +289,7 @@ const LoginPage: React.FC = () => {
             </div>
             
             {/* Footer */}
-            <p className="text-center text-xs text-white/60 mt-6">
+            <p className="text-center text-[11px] leading-tight text-white/60 mt-2 sm:mt-6">
               © 2024 Society for Family Health Rwanda. All rights reserved.
             </p>
           </motion.div>

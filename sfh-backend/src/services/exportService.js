@@ -714,4 +714,4 @@ async function exportData(entity, format, reportType, dateOpts = {}) {
   };
 }
 
-module.exports = { exportData, toSimplePdf, toFormattedPdf };
+module.exports = { exportData, toFormattedPdf };

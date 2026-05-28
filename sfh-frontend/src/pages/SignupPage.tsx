@@ -49,7 +49,7 @@ const SignupPage: React.FC = () => {
   const inputStyle: React.CSSProperties = {
     display: 'flex',
     width: '100%',
-    height: '48px',
+    height: '44px',
     padding: '0 14px',
     borderRadius: '8px',
     background: 'rgba(255,255,255,0.07)',
@@ -68,7 +68,7 @@ const SignupPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex relative overflow-hidden" data-theme="light">
+    <div className="min-h-screen lg:h-screen flex relative overflow-y-auto lg:overflow-hidden" data-theme="light">
       {/* Full Background */}
       <div className="absolute inset-0">
         <img src={loginHero} alt="Community Health" className="w-full h-full object-cover" />
@@ -82,52 +82,52 @@ const SignupPage: React.FC = () => {
       </div>
 
       {/* Content */}
-      <div className="relative z-10 w-full flex flex-col lg:flex-row min-h-screen">
+      <div className="relative z-10 w-full flex flex-col lg:flex-row min-h-screen lg:h-full">
         {/* Left Panel */}
-        <div className="w-full lg:w-3/5 flex flex-col justify-center p-8 lg:p-16 xl:p-24">
-          <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="mb-8 lg:mb-12">
-            <div className="w-52 h-52 sm:w-60 sm:h-60 lg:w-72 lg:h-72">
+        <div className="w-full lg:w-3/5 flex flex-col justify-start p-4 sm:p-6 lg:p-10 xl:p-14 lg:justify-center">
+          <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="mb-3 sm:mb-5 lg:mb-6">
+            <div className="w-28 h-28 sm:w-36 sm:h-36 lg:w-48 lg:h-48 xl:w-56 xl:h-56">
               <img src={sfhLogo} alt="SFH Rwanda Logo" className="w-full h-full object-contain" />
             </div>
           </motion.div>
 
-          <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.2 }} className="mb-8">
-            <h1 className="text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-display font-bold text-white leading-tight mb-4">
+          <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.2 }} className="mb-3 sm:mb-5 lg:mb-4">
+            <h1 className="text-xl sm:text-2xl md:text-4xl lg:text-5xl xl:text-6xl font-display font-bold text-white leading-tight mb-2 sm:mb-3">
               Join Our<br />Mission.
             </h1>
-            <h2 className="text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-display font-bold text-secondary italic">
+            <h2 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl xl:text-5xl font-display font-bold text-secondary italic">
               Make a Difference
             </h2>
           </motion.div>
 
-          <motion.p initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.4 }} className="text-lg lg:text-xl text-white/80 max-w-xl leading-relaxed mb-8 lg:mb-12">
+          <motion.p initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.4 }} className="text-xs sm:text-sm lg:text-base xl:text-lg text-white/80 max-w-xl leading-relaxed mb-2 sm:mb-4 lg:mb-6">
             Create your account to join the SFH Rwanda team and help us empower communities
             to live healthier, more fulfilled lives across Rwanda.
           </motion.p>
 
-          <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.6 }} className="hidden lg:flex items-center gap-8">
+          <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.6 }} className="hidden lg:flex items-center gap-5">
             <div className="text-center">
-              <p className="text-3xl font-bold text-white">500+</p>
-              <p className="text-sm text-white/60">Volunteers</p>
+              <p className="text-2xl font-bold text-white">500+</p>
+              <p className="text-xs text-white/60">Volunteers</p>
             </div>
-            <div className="w-px h-12 bg-white/20" />
+            <div className="w-px h-10 bg-white/20" />
             <div className="text-center">
-              <p className="text-3xl font-bold text-white">30</p>
-              <p className="text-sm text-white/60">Districts</p>
+              <p className="text-2xl font-bold text-white">30</p>
+              <p className="text-xs text-white/60">Districts</p>
             </div>
-            <div className="w-px h-12 bg-white/20" />
+            <div className="w-px h-10 bg-white/20" />
             <div className="text-center">
-              <p className="text-3xl font-bold text-white">100K+</p>
-              <p className="text-sm text-white/60">Lives Impacted</p>
+              <p className="text-2xl font-bold text-white">100K+</p>
+              <p className="text-xs text-white/60">Lives Impacted</p>
             </div>
           </motion.div>
         </div>
 
         {/* Right Panel - Signup Form */}
-        <div className="w-full lg:w-2/5 flex items-center justify-center p-6 lg:p-12">
-          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.5, delay: 0.3 }} className="w-full max-w-md">
+        <div className="w-full lg:w-2/5 flex items-center justify-start p-3 sm:p-6 lg:p-8 xl:p-10 lg:justify-center">
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.5, delay: 0.3 }} className="w-full max-w-sm lg:max-w-md">
             <div
-              className="rounded-2xl shadow-2xl p-8 lg:p-10"
+              className="rounded-2xl shadow-2xl p-4 sm:p-5 lg:p-6"
               style={{
                 background: 'rgba(0, 10, 40, 0.72)',
                 backdropFilter: 'blur(24px)',
@@ -136,19 +136,19 @@ const SignupPage: React.FC = () => {
                 boxShadow: '0 8px 40px 0 rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.08)',
               }}
             >
-              <div className="text-center mb-6">
-                <div className="w-32 h-32 mx-auto mb-3">
+              <div className="text-center mb-4 sm:mb-5">
+                <div className="w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-2">
                   <img src={sfhLogo} alt="SFH Rwanda Logo" className="w-full h-full object-contain" />
                 </div>
-                <h2 className="text-2xl font-display font-bold text-white mb-2">Create Account</h2>
-                <p className="text-sm" style={{ color: 'rgba(255,255,255,0.55)' }}>
+                <h2 className="text-xl sm:text-2xl font-display font-bold text-white mb-1">Create Account</h2>
+                <p className="text-xs sm:text-sm" style={{ color: 'rgba(255,255,255,0.55)' }}>
                   Join the SFH Rwanda team
                 </p>
               </div>
 
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <form onSubmit={handleSubmit} className="space-y-2.5 sm:space-y-3">
                 {/* Full Name */}
-                <div className="space-y-1.5">
+                <div className="space-y-1">
                   <label htmlFor="fullName" className="text-sm font-medium" style={{ color: 'rgba(255,255,255,0.80)' }}>
                     Full Name
                   </label>
@@ -166,7 +166,7 @@ const SignupPage: React.FC = () => {
                 </div>
 
                 {/* Email */}
-                <div className="space-y-1.5">
+                <div className="space-y-1">
                   <label htmlFor="email" className="text-sm font-medium" style={{ color: 'rgba(255,255,255,0.80)' }}>
                     Email Address
                   </label>
@@ -184,7 +184,7 @@ const SignupPage: React.FC = () => {
                 </div>
 
                 {/* Password */}
-                <div className="space-y-1.5">
+                <div className="space-y-1">
                   <label htmlFor="password" className="text-sm font-medium" style={{ color: 'rgba(255,255,255,0.80)' }}>
                     Password
                   </label>
@@ -207,7 +207,7 @@ const SignupPage: React.FC = () => {
                 </div>
 
                 {/* Confirm Password */}
-                <div className="space-y-1.5">
+                <div className="space-y-1">
                   <label htmlFor="confirmPassword" className="text-sm font-medium" style={{ color: 'rgba(255,255,255,0.80)' }}>
                     Confirm Password
                   </label>
@@ -262,7 +262,7 @@ const SignupPage: React.FC = () => {
                 {/* Submit */}
                 <Button
                   type="submit"
-                  className="w-full h-12 text-base font-semibold"
+                  className="w-full h-11 text-sm sm:text-base font-semibold"
                   style={{ background: 'linear-gradient(135deg, rgba(57,255,20,0.85) 0%, rgba(0,180,0,0.9) 100%)', color: '#001a00', border: 'none' }}
                   disabled={isLoading}
                 >
@@ -283,8 +283,8 @@ const SignupPage: React.FC = () => {
               </form>
 
               {/* Login Link */}
-              <div className="mt-6 text-center">
-                <p className="text-sm" style={{ color: 'rgba(255,255,255,0.55)' }}>
+              <div className="mt-3 sm:mt-4 text-center">
+                <p className="text-xs sm:text-sm" style={{ color: 'rgba(255,255,255,0.55)' }}>
                   Already have an account?{' '}
                   <Link to="/login" className="font-semibold hover:underline" style={{ color: 'rgba(57,255,20,0.85)' }}>
                     Sign in here
@@ -293,7 +293,7 @@ const SignupPage: React.FC = () => {
               </div>
             </div>
 
-            <p className="text-center text-xs text-white/60 mt-6">
+            <p className="text-center text-[11px] leading-tight text-white/60 mt-2 sm:mt-4">
               © 2024 Society for Family Health Rwanda. All rights reserved.
             </p>
           </motion.div>
