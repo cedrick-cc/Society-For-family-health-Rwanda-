@@ -290,7 +290,7 @@ const LoginPage: React.FC = () => {
             
             {/* Footer */}
             <p className="text-center text-[11px] leading-tight text-white/60 mt-2 sm:mt-6">
-              © 2024 Society for Family Health Rwanda. All rights reserved.
+              © 2026 Society for Family Health Rwanda. All rights reserved.
             </p>
           </motion.div>
         </div>
