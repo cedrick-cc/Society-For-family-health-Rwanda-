@@ -9,6 +9,7 @@ router.get('/pending', authenticate, requireRole('ADMIN'), userController.getPen
 router.patch('/:id/approve', authenticate, requireRole('ADMIN'), userController.approveUser);
 router.patch('/:id/reject', authenticate, requireRole('ADMIN'), userController.rejectUser);
 router.patch('/:id/deactivate', authenticate, requireRole('ADMIN'), userController.deactivateUser);
+router.patch('/:id/activate', authenticate, requireRole('ADMIN'), userController.activateUser);
 router.patch('/:id/reset-password', authenticate, requireRole('ADMIN'), userController.resetUserPassword);
 router.patch('/:id', authenticate, requireRole('ADMIN'), userController.updateUser);
 

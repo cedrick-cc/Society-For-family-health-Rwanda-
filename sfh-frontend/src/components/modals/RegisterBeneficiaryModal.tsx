@@ -1,15 +1,22 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { HeartHandshake, User, MapPin, Stethoscope, Phone } from 'lucide-react';
-import { createBeneficiary, getPrograms, getProgramsAsVolunteer, updateBeneficiary } from '@/services/api';
+import { HeartHandshake, User, MapPin, Stethoscope, Phone, IdCard } from 'lucide-react';
+import { createBeneficiary, getPrograms, getProgramsAsVolunteer, getProgram, updateBeneficiary } from '@/services/api';
 import { useAuth } from '@/contexts/AuthContext';
 import type { ApiBeneficiary } from '@/lib/entityMappers';
+import {
+  RWANDA_DISTRICTS,
+  SECTORS_BY_DISTRICT,
+  ageFromRwandaNationalId,
+  validateNationalIdFormat,
+} from '@/lib/rwandaDistricts';
 import { toast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 
 export interface RegisterBeneficiaryModalProps {
   open: boolean;
@@ -17,13 +24,6 @@ export interface RegisterBeneficiaryModalProps {
   onSaved?: () => void;
   beneficiaryToEdit?: ApiBeneficiary | null;
 }
-
-const districts = [
-  'Kigali City', 'Bugesera', 'Gatsibo', 'Kayonza', 'Kirehe', 'Ngoma', 'Nyagatare', 'Rwamagana',
-  'Burera', 'Gakenke', 'Gicumbi', 'Musanze', 'Rulindo', 'Gisagara', 'Huye', 'Kamonyi',
-  'Muhanga', 'Nyamagabe', 'Nyanza', 'Nyaruguru', 'Ruhango', 'Karongi', 'Ngororero',
-  'Nyabihu', 'Nyamasheke', 'Rubavu', 'Rusizi', 'Rutsiro',
-];
 
 function ageFromAgeGroup(ageGroup: string): number {
   if (!ageGroup) return 25;
@@ -51,6 +51,7 @@ const emptyForm = () => ({
   firstName: '',
   lastName: '',
   phone: '',
+  nationalId: '',
   ageGroup: '',
   editAge: '',
   gender: '',
@@ -66,6 +67,8 @@ const emptyForm = () => ({
   notes: '',
 });
 
+type ProgramAgeLimits = { minAge?: number | null; maxAge?: number | null; title?: string };
+
 const RegisterBeneficiaryModal: React.FC<RegisterBeneficiaryModalProps> = ({
   open,
   onOpenChange,
@@ -75,6 +78,7 @@ const RegisterBeneficiaryModal: React.FC<RegisterBeneficiaryModalProps> = ({
   const { user } = useAuth();
   const [formData, setFormData] = useState(emptyForm);
   const [programs, setPrograms] = useState<Array<{ id: string; title: string }>>([]);
+  const [programAgeLimits, setProgramAgeLimits] = useState<ProgramAgeLimits | null>(null);
   const [loadingPrograms, setLoadingPrograms] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -105,6 +109,30 @@ const RegisterBeneficiaryModal: React.FC<RegisterBeneficiaryModalProps> = ({
   }, [open, user?.role, beneficiaryToEdit]);
 
   useEffect(() => {
+    if (!open || !formData.program) {
+      setProgramAgeLimits(null);
+      return;
+    }
+    let cancelled = false;
+    getProgram(formData.program)
+      .then((p) => {
+        if (!cancelled) {
+          setProgramAgeLimits({
+            minAge: (p as { minAge?: number }).minAge ?? null,
+            maxAge: (p as { maxAge?: number }).maxAge ?? null,
+            title: (p as { title?: string }).title,
+          });
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setProgramAgeLimits(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, formData.program]);
+
+  useEffect(() => {
     if (!open) return;
     if (beneficiaryToEdit) {
       const parts = (beneficiaryToEdit.fullName || '').trim().split(/\s+/);
@@ -115,6 +143,7 @@ const RegisterBeneficiaryModal: React.FC<RegisterBeneficiaryModalProps> = ({
         firstName,
         lastName,
         phone: beneficiaryToEdit.phone || '',
+        nationalId: (beneficiaryToEdit as ApiBeneficiary & { nationalId?: string }).nationalId || '',
         editAge: String(beneficiaryToEdit.age ?? ''),
         gender: (beneficiaryToEdit.gender || '').toLowerCase(),
         householdSize: String(beneficiaryToEdit.householdSize ?? 1),
@@ -128,6 +157,39 @@ const RegisterBeneficiaryModal: React.FC<RegisterBeneficiaryModalProps> = ({
       setFormData(emptyForm());
     }
   }, [open, beneficiaryToEdit]);
+
+  const computedAgeFromId = useMemo(() => {
+    if (beneficiaryToEdit || !formData.nationalId.trim()) return null;
+    if (!validateNationalIdFormat(formData.nationalId)) return null;
+    return ageFromRwandaNationalId(formData.nationalId);
+  }, [formData.nationalId, beneficiaryToEdit]);
+
+  const ageValidation = useMemo(() => {
+    if (beneficiaryToEdit || computedAgeFromId === null) return null;
+    const { minAge, maxAge } = programAgeLimits || {};
+    if (minAge == null && maxAge == null) return null;
+    const age = computedAgeFromId;
+    if (minAge != null && age < minAge) {
+      return {
+        valid: false,
+        message: `Age ${age} is below the program minimum (${minAge} years).`,
+      };
+    }
+    if (maxAge != null && age > maxAge) {
+      return {
+        valid: false,
+        message: `Age ${age} exceeds the program maximum (${maxAge} years).`,
+      };
+    }
+    return {
+      valid: true,
+      message: `Age ${age} meets program requirements${minAge != null || maxAge != null ? ` (${minAge ?? '—'}–${maxAge ?? '—'} years)` : ''}.`,
+    };
+  }, [beneficiaryToEdit, computedAgeFromId, programAgeLimits]);
+
+  const sectorOptions = formData.district
+    ? SECTORS_BY_DISTRICT[formData.district] || []
+    : [];
 
   const updateFormData = (field: string, value: string | boolean) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -145,11 +207,22 @@ const RegisterBeneficiaryModal: React.FC<RegisterBeneficiaryModalProps> = ({
       return;
     }
 
+    if (!beneficiaryToEdit && formData.nationalId.trim() && !validateNationalIdFormat(formData.nationalId)) {
+      toast({ title: 'Invalid national ID', description: 'National ID must be 16 digits.', variant: 'destructive' });
+      return;
+    }
+
+    if (ageValidation && !ageValidation.valid) {
+      toast({ title: 'Age not eligible', description: ageValidation.message, variant: 'destructive' });
+      return;
+    }
+
     const age = beneficiaryToEdit
       ? Math.min(130, Math.max(0, parseInt(formData.editAge, 10) || 0))
-      : ageFromAgeGroup(formData.ageGroup);
-    if (!beneficiaryToEdit && !formData.ageGroup) {
-      toast({ title: 'Age required', description: 'Select an age group.', variant: 'destructive' });
+      : computedAgeFromId ?? ageFromAgeGroup(formData.ageGroup);
+
+    if (!beneficiaryToEdit && !formData.nationalId.trim() && !formData.ageGroup) {
+      toast({ title: 'Age required', description: 'Enter national ID or select an age group.', variant: 'destructive' });
       return;
     }
     if (beneficiaryToEdit && (!formData.editAge || Number.isNaN(parseInt(formData.editAge, 10)))) {
@@ -163,7 +236,7 @@ const RegisterBeneficiaryModal: React.FC<RegisterBeneficiaryModalProps> = ({
     if (formData.healthConditions) servicesReceived.push(`notes:${formData.healthConditions}`);
     if (formData.notes) servicesReceived.push(`additional:${formData.notes}`);
 
-    const payload = {
+    const payload: Record<string, unknown> = {
       fullName,
       gender: formData.gender,
       age,
@@ -178,6 +251,9 @@ const RegisterBeneficiaryModal: React.FC<RegisterBeneficiaryModalProps> = ({
       servicesReceived,
       assignedProgramId: formData.program,
     };
+    if (formData.nationalId.trim()) {
+      payload.nationalId = formData.nationalId.replace(/\s/g, '');
+    }
 
     setSubmitting(true);
     try {
@@ -199,9 +275,11 @@ const RegisterBeneficiaryModal: React.FC<RegisterBeneficiaryModalProps> = ({
     }
   };
 
+  const submitBlocked = Boolean(ageValidation && !ageValidation.valid);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-w-[95vw] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl font-display">
             <HeartHandshake className="w-5 h-5 text-secondary" />
@@ -215,7 +293,7 @@ const RegisterBeneficiaryModal: React.FC<RegisterBeneficiaryModalProps> = ({
               <User className="w-4 h-4" />
               Personal Information
             </h3>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>First Name *</Label>
                 <Input
@@ -235,7 +313,7 @@ const RegisterBeneficiaryModal: React.FC<RegisterBeneficiaryModalProps> = ({
                 />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="flex items-center gap-1"><Phone className="w-3 h-3" /> Phone Number</Label>
                 <Input
@@ -244,6 +322,25 @@ const RegisterBeneficiaryModal: React.FC<RegisterBeneficiaryModalProps> = ({
                   onChange={(e) => updateFormData('phone', e.target.value)}
                 />
               </div>
+              {!beneficiaryToEdit && (
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-1"><IdCard className="w-3 h-3" /> National ID</Label>
+                  <Input
+                    placeholder="16-digit Rwanda national ID"
+                    value={formData.nationalId}
+                    onChange={(e) => updateFormData('nationalId', e.target.value.replace(/\D/g, '').slice(0, 16))}
+                    maxLength={16}
+                  />
+                  {formData.nationalId.length > 0 && formData.nationalId.length < 16 && (
+                    <p className="text-xs text-muted-foreground">{formData.nationalId.length}/16 digits</p>
+                  )}
+                  {ageValidation && (
+                    <p className={cn('text-xs font-medium', ageValidation.valid ? 'text-success' : 'text-destructive')}>
+                      {ageValidation.message}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           </div>
           <div className="space-y-4">
@@ -265,10 +362,15 @@ const RegisterBeneficiaryModal: React.FC<RegisterBeneficiaryModalProps> = ({
                 </div>
               ) : (
                 <div className="space-y-2">
-                  <Label>Age Group *</Label>
-                  <Select value={formData.ageGroup} onValueChange={(v) => updateFormData('ageGroup', v)} required>
+                  <Label>Age Group {!formData.nationalId.trim() ? '*' : ''}</Label>
+                  <Select
+                    value={formData.ageGroup}
+                    onValueChange={(v) => updateFormData('ageGroup', v)}
+                    required={!formData.nationalId.trim()}
+                    disabled={Boolean(computedAgeFromId !== null)}
+                  >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select" />
+                      <SelectValue placeholder={computedAgeFromId != null ? `From ID: ${computedAgeFromId} yrs` : 'Select'} />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="0-5">0-5 years</SelectItem>
@@ -343,15 +445,15 @@ const RegisterBeneficiaryModal: React.FC<RegisterBeneficiaryModalProps> = ({
               <MapPin className="w-4 h-4" />
               Location
             </h3>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label>District *</Label>
-                <Select value={formData.district} onValueChange={(v) => updateFormData('district', v)} required>
+                <Select value={formData.district} onValueChange={(v) => { updateFormData('district', v); updateFormData('sector', ''); }} required>
                   <SelectTrigger>
                     <SelectValue placeholder="Select" />
                   </SelectTrigger>
                   <SelectContent>
-                    {districts.map((d) => (
+                    {RWANDA_DISTRICTS.map((d) => (
                       <SelectItem key={d} value={d}>{d}</SelectItem>
                     ))}
                   </SelectContent>
@@ -359,11 +461,24 @@ const RegisterBeneficiaryModal: React.FC<RegisterBeneficiaryModalProps> = ({
               </div>
               <div className="space-y-2">
                 <Label>Sector</Label>
-                <Input
-                  placeholder="Sector name"
-                  value={formData.sector}
-                  onChange={(e) => updateFormData('sector', e.target.value)}
-                />
+                {sectorOptions.length > 0 ? (
+                  <Select value={formData.sector} onValueChange={(v) => updateFormData('sector', v)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select sector" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {sectorOptions.map((s) => (
+                        <SelectItem key={s} value={s}>{s}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Input
+                    placeholder="Sector name"
+                    value={formData.sector}
+                    onChange={(e) => updateFormData('sector', e.target.value)}
+                  />
+                )}
               </div>
               <div className="space-y-2">
                 <Label>Village / Cell</Label>
@@ -381,7 +496,7 @@ const RegisterBeneficiaryModal: React.FC<RegisterBeneficiaryModalProps> = ({
               <Stethoscope className="w-4 h-4" />
               Health Service
             </h3>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Program *</Label>
                 <Select
@@ -399,6 +514,11 @@ const RegisterBeneficiaryModal: React.FC<RegisterBeneficiaryModalProps> = ({
                     ))}
                   </SelectContent>
                 </Select>
+                {programAgeLimits && (programAgeLimits.minAge != null || programAgeLimits.maxAge != null) && (
+                  <p className="text-xs text-muted-foreground">
+                    Eligible age: {programAgeLimits.minAge ?? '—'} – {programAgeLimits.maxAge ?? '—'} years
+                  </p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label>Service Type</Label>
@@ -451,7 +571,7 @@ const RegisterBeneficiaryModal: React.FC<RegisterBeneficiaryModalProps> = ({
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>
               Cancel
             </Button>
-            <Button type="submit" disabled={submitting}>
+            <Button type="submit" disabled={submitting || submitBlocked}>
               {submitting ? 'Saving…' : beneficiaryToEdit ? 'Save changes' : 'Register Beneficiary'}
             </Button>
           </div>

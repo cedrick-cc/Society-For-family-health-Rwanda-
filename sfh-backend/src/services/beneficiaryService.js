@@ -1,4 +1,5 @@
 const { PrismaClient } = require('@prisma/client');
+const { ageFromNationalId, isValidNationalIdFormat } = require('../utils/rwandaNationalId');
 
 const prisma = new PrismaClient();
 
@@ -40,11 +41,43 @@ async function assertProgramAccess(assignedProgramId, user) {
   }
 }
 
+async function validateBeneficiaryAgeForProgram(assignedProgramId, ageNum, nationalId) {
+  if (!assignedProgramId) return ageNum;
+
+  const program = await prisma.program.findUnique({
+    where: { id: assignedProgramId },
+    select: { minAge: true, maxAge: true, title: true },
+  });
+  if (!program) throw new Error('assignedProgramId does not match an existing program.');
+
+  let effectiveAge = ageNum;
+  if (nationalId) {
+    if (!isValidNationalIdFormat(nationalId)) {
+      throw new Error('nationalId must be a valid 16-digit Rwanda national ID.');
+    }
+    const derived = ageFromNationalId(nationalId);
+    if (derived !== null) effectiveAge = derived;
+  }
+
+  if (program.minAge != null && effectiveAge < program.minAge) {
+    throw new Error(
+      `Beneficiary age (${effectiveAge}) is below the program minimum age (${program.minAge}) for ${program.title}.`
+    );
+  }
+  if (program.maxAge != null && effectiveAge > program.maxAge) {
+    throw new Error(
+      `Beneficiary age (${effectiveAge}) exceeds the program maximum age (${program.maxAge}) for ${program.title}.`
+    );
+  }
+  return effectiveAge;
+}
+
 const createBeneficiary = async (data, registeredById, user) => {
   const {
     fullName,
     gender,
     age,
+    nationalId,
     phone,
     district,
     sector,
@@ -71,11 +104,14 @@ const createBeneficiary = async (data, registeredById, user) => {
 
   if (user) await assertProgramAccess(assignedProgramId, user);
 
+  const validatedAge = await validateBeneficiaryAgeForProgram(assignedProgramId, ageNum, nationalId);
+
   const row = await prisma.beneficiary.create({
     data: {
       fullName: String(fullName).trim(),
       gender: String(gender).trim(),
-      age: ageNum,
+      age: validatedAge,
+      nationalId: nationalId ? String(nationalId).replace(/\D/g, '') : null,
       phone: phone ? String(phone).trim() : null,
       district: String(district).trim(),
       sector: sector ? String(sector).trim() : null,

@@ -114,6 +114,7 @@ model User {
   yearsOfExperience    Int                  @default(0)
   volunteerDistrict    String?
   phone                String?
+  nationalId           String?
   bio                  String?
   programsCreated      Program[]            @relation("ProgramCreator")
   managedPrograms      Program[]            @relation("ProgramFieldManager")
@@ -131,6 +132,7 @@ model User {
   auditLogs            AuditLog[]
   scheduledActivitiesCreated ScheduledActivity[] @relation("ScheduledActivityCreator")
   scheduledActivityAssignments ScheduledActivityVolunteer[] @relation("ScheduledActivityVolunteer")
+  scheduledActivityFieldManagerAssignments ScheduledActivityFieldManager[] @relation("ScheduledActivityFieldManager")
   announcementsCreated Announcement[] @relation("AnnouncementCreator")
 }
 
@@ -151,11 +153,16 @@ model Program {
   description         String
   district            String
   sector              String?
+  districts           String[]           @default([])
+  sectorsList         String[]           @default([])
   startDate           DateTime
   endDate             DateTime
   status              ProgramStatus
   programType         ProgramType
   targetBeneficiaries Int                @default(0)
+  targetBeneficiaryCategory String?
+  minAge              Int?
+  maxAge              Int?
   volunteersNeeded    Int                @default(0)
   progress            Int                @default(0)
   createdById         String
@@ -190,6 +197,7 @@ model Beneficiary {
   fullName          String
   gender            String
   age               Int
+  nationalId        String?
   phone             String?
   district          String
   sector            String?
@@ -385,6 +393,7 @@ model ScheduledActivity {
   program      Program? @relation(fields: [programId], references: [id], onDelete: SetNull)
   createdBy    User     @relation("ScheduledActivityCreator", fields: [createdById], references: [id])
   assignments  ScheduledActivityVolunteer[]
+  fieldManagerAssignments ScheduledActivityFieldManager[]
 
   @@index([date])
   @@index([programId])
@@ -412,4 +421,14 @@ model ScheduledActivityVolunteer {
 
   @@id([scheduledActivityId, volunteerId])
   @@index([volunteerId])
+}
+
+model ScheduledActivityFieldManager {
+  scheduledActivityId String
+  fieldManagerId      String
+  scheduledActivity   ScheduledActivity @relation(fields: [scheduledActivityId], references: [id], onDelete: Cascade)
+  fieldManager        User              @relation("ScheduledActivityFieldManager", fields: [fieldManagerId], references: [id], onDelete: Cascade)
+
+  @@id([scheduledActivityId, fieldManagerId])
+  @@index([fieldManagerId])
 }

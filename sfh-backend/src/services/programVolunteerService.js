@@ -1,31 +1,23 @@
 const { randomUUID } = require('crypto');
 const { PrismaClient } = require('@prisma/client');
 const { programInclude, mapProgram } = require('./programService');
+const { computeProgramStatus } = require('../utils/programStatus');
 const notificationService = require('./notificationService');
+const { syncVolunteerOpsStatus } = require('../utils/volunteerOpsSync');
 
 const prisma = new PrismaClient();
-
-async function syncVolunteerOpsStatus(volunteerId) {
-  const user = await prisma.user.findUnique({
-    where: { id: volunteerId },
-    select: { id: true, role: true, volunteerOpsStatus: true },
-  });
-  if (!user || user.role !== 'VOLUNTEER') return;
-  if (user.volunteerOpsStatus === 'ON_LEAVE') return;
-
-  const count = await prisma.programVolunteer.count({ where: { volunteerId } });
-  await prisma.user.update({
-    where: { id: volunteerId },
-    data: { volunteerOpsStatus: count > 0 ? 'ASSIGNED' : 'AVAILABLE' },
-  });
-}
 
 async function assignVolunteers(programId, volunteerIds, assignedById) {
   const program = await prisma.program.findUnique({
     where: { id: programId },
-    select: { id: true, fieldManagerId: true },
+    select: { id: true, fieldManagerId: true, startDate: true, endDate: true, title: true },
   });
   if (!program) throw new Error('Program not found.');
+
+  const programStatus = computeProgramStatus(program.startDate, program.endDate);
+  if (programStatus === 'COMPLETED') {
+    throw new Error('Cannot assign volunteers to a completed program.');
+  }
 
   const ids = Array.isArray(volunteerIds) ? volunteerIds : [];
   const unique = [...new Set(ids.map((id) => String(id).trim()).filter(Boolean))];
@@ -106,6 +98,21 @@ async function unassignVolunteer(programId, volunteerId) {
 }
 
 async function listAvailableVolunteers(programId) {
+  const program = await prisma.program.findUnique({
+    where: { id: programId },
+    select: { district: true, districts: true, startDate: true, endDate: true },
+  });
+  if (!program) throw new Error('Program not found.');
+
+  const programStatus = computeProgramStatus(program.startDate, program.endDate);
+  if (programStatus === 'COMPLETED') {
+    throw new Error('Cannot assign volunteers to a completed program.');
+  }
+
+  const programDistricts = new Set(
+    [program.district, ...(program.districts || [])].filter(Boolean).map((d) => d.toLowerCase())
+  );
+
   const assigned = await prisma.programVolunteer.findMany({
     where: { programId },
     select: { volunteerId: true },
@@ -115,10 +122,11 @@ async function listAvailableVolunteers(programId) {
   const where = {
     role: 'VOLUNTEER',
     status: 'ACTIVE',
+    volunteerOpsStatus: { not: 'ON_LEAVE' },
   };
   if (assignedIds.length) where.id = { notIn: assignedIds };
 
-  return prisma.user.findMany({
+  const rows = await prisma.user.findMany({
     where,
     select: {
       id: true,
@@ -130,8 +138,20 @@ async function listAvailableVolunteers(programId) {
       volunteerDistrict: true,
       _count: { select: { programVolunteers: true } },
     },
-    orderBy: { name: 'asc' },
   });
+
+  const sorted = rows.sort((a, b) => {
+    const aLocal = programDistricts.has((a.volunteerDistrict || '').toLowerCase()) ? 0 : 1;
+    const bLocal = programDistricts.has((b.volunteerDistrict || '').toLowerCase()) ? 0 : 1;
+    if (aLocal !== bLocal) return aLocal - bLocal;
+    return a.name.localeCompare(b.name);
+  });
+
+  return sorted.map(({ _count, ...rest }) => ({
+    ...rest,
+    isLocalVolunteer: programDistricts.has((rest.volunteerDistrict || '').toLowerCase()),
+    programCount: _count?.programVolunteers ?? 0,
+  }));
 }
 
 module.exports = {

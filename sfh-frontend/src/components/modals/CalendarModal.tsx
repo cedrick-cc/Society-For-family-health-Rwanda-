@@ -78,9 +78,6 @@ const CalendarModal: React.FC<CalendarModalProps> = ({ open, onOpenChange }) => 
               <h3 className="font-semibold">
                 {selectedDate ? format(selectedDate, 'EEEE, MMMM d, yyyy') : 'Select a date'}
               </h3>
-              <Button size="sm" variant="outline" onClick={loadEvents} disabled={loading}>
-                Refresh
-              </Button>
             </div>
 
             <div className="space-y-3 flex-1 overflow-y-auto overscroll-contain min-h-0 pr-1">

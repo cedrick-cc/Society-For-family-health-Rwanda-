@@ -93,7 +93,7 @@ const systemNavItems: NavItem[] = [
     title: 'Announcements',
     icon: Bell,
     path: '/dashboard/announcements',
-    roles: ['admin', 'coordinator'],
+    roles: ['admin', 'coordinator', 'field_manager', 'analyst', 'volunteer'],
   },
 ];
 

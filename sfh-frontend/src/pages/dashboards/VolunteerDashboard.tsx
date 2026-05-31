@@ -21,12 +21,12 @@ import {
 import { cn } from '@/lib/utils';
 import { EmptyState } from '@/components/ui/empty-state';
 import RegisterBeneficiaryModal from '@/components/modals/RegisterBeneficiaryModal';
-import ScheduleActivityModal from '@/components/modals/ScheduleActivityModal';
 import CalendarModal from '@/components/modals/CalendarModal';
 import SubmitFieldReportModal from '@/components/modals/SubmitFieldReportModal';
 import ViewFieldReportModal from '@/components/modals/ViewFieldReportModal';
 import RecentFieldReports from '@/components/volunteer/RecentFieldReports';
 import AnnouncementsCard from '@/components/AnnouncementsCard';
+import AssignedActivitiesCard from '@/components/AssignedActivitiesCard';
 import { type FieldReport } from '@/types/fieldReport';
 import { type Program, type Task, mapApiFieldReportToUI } from '@/lib/api';
 import { getVolunteerDashboard, updateTask } from '@/services/api';
@@ -53,7 +53,6 @@ const typeColors: Record<string, string> = {
 const VolunteerDashboard: React.FC = () => {
   const { user } = useAuth();
   const [showRegister, setShowRegister] = useState(false);
-  const [showSchedule, setShowSchedule] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
   const [showFieldReport, setShowFieldReport] = useState(false);
   const [viewReport, setViewReport] = useState<FieldReport | null>(null);
@@ -255,9 +254,6 @@ const VolunteerDashboard: React.FC = () => {
                   {completedToday}/{totalToday}
                 </span>
               </CardTitle>
-              <Button variant="ghost" size="sm" className="text-xs gap-1" onClick={() => setShowSchedule(true)}>
-                + Add Task
-              </Button>
             </CardHeader>
             <CardContent>
               {totalToday > 0 && (
@@ -429,10 +425,14 @@ const VolunteerDashboard: React.FC = () => {
           </Card>
         </motion.div>
 
-        {/* Announcements + Badges + Quick Actions */}
-        <motion.div variants={item} className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Assigned activities + announcements */}
+        <motion.div variants={item} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <AssignedActivitiesCard compact />
           <AnnouncementsCard compact />
+        </motion.div>
 
+        {/* Achievements + Quick Actions */}
+        <motion.div variants={item} className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <Card className="sfh-card">
             <CardHeader className="pb-3">
               <CardTitle className="text-base font-semibold flex items-center gap-2">
@@ -466,7 +466,6 @@ const VolunteerDashboard: React.FC = () => {
                 { label: 'Register Beneficiary', icon: HeartHandshake, color: 'text-primary', action: () => setShowRegister(true) },
                 { label: 'Submit Field Report', icon: ClipboardList, color: 'text-info', action: () => setShowFieldReport(true) },
                 { label: 'View Schedule', icon: Calendar, color: 'text-secondary', action: () => setShowCalendar(true) },
-                { label: 'Schedule Activity', icon: Clock, color: 'text-accent', action: () => setShowSchedule(true) },
               ].map((a) => (
                 <Button key={a.label} variant="outline" className="w-full justify-between h-11 px-4" onClick={a.action}>
                   <div className="flex items-center gap-3">
@@ -486,7 +485,6 @@ const VolunteerDashboard: React.FC = () => {
       </motion.div>
 
       <RegisterBeneficiaryModal open={showRegister} onOpenChange={setShowRegister} />
-      <ScheduleActivityModal open={showSchedule} onOpenChange={setShowSchedule} />
       <CalendarModal open={showCalendar} onOpenChange={setShowCalendar} />
       <SubmitFieldReportModal
         open={showFieldReport}

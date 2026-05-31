@@ -5,11 +5,11 @@ import TopHeader from '@/components/TopHeader';
 
 const DashboardLayout: React.FC = () => {
   return (
-    <div className="min-h-screen flex w-full">
+    <div className="min-h-screen flex w-full overflow-x-hidden">
       <AppSidebar />
       <div className="flex-1 flex flex-col min-w-0 dashboard-pattern">
         <TopHeader />
-        <main className="flex-1 overflow-auto p-6">
+        <main className="flex-1 overflow-auto p-4 sm:p-6">
           <Outlet />
         </main>
       </div>

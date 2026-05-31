@@ -210,7 +210,7 @@ const CoordinatorDashboard: React.FC = () => {
           </div>
         </motion.div>
 
-        <motion.div variants={item} className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <motion.div variants={item} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {stats.map((s) => (
             <motion.div key={s.title} whileHover={{ y: -4 }} className="kpi-card">
               <div className="flex items-start justify-between">
@@ -321,19 +321,54 @@ const CoordinatorDashboard: React.FC = () => {
                 ))
               )}
             </CardContent>
-            <CardContent className="pt-3 border-t shrink-0">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Recent submissions</p>
+          </Card>
+        </motion.div>
+
+        <motion.div variants={item}>
+          <Card className="sfh-card">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <FileText className="w-4 h-4 text-primary" />
+                Recent Field Reports
+              </CardTitle>
+              <p className="text-xs text-muted-foreground mt-1">Latest submissions across your programs.</p>
+            </CardHeader>
+            <CardContent>
               {recentReports.length === 0 ? (
-                <p className="text-xs text-muted-foreground">No recent activity.</p>
+                <EmptyState icon={FileText} title="No recent reports" description="Field reports will appear here once volunteers submit them." compact />
               ) : (
-                <ul className="space-y-2 max-h-32 overflow-y-auto">
-                  {recentReports.map((r) => (
-                    <li key={r.id} className="text-xs text-muted-foreground flex justify-between gap-2">
-                      <span className="truncate">{r.volunteerName} — {r.program}</span>
-                      <span className="shrink-0 text-[10px] uppercase">{r.reviewStatus || 'pending'}</span>
-                    </li>
-                  ))}
-                </ul>
+                <div className="overflow-x-auto -mx-1">
+                  <table className="w-full text-sm min-w-[640px]">
+                    <thead>
+                      <tr className="border-b text-xs text-muted-foreground">
+                        <th className="text-left py-2 px-2 font-medium">Volunteer</th>
+                        <th className="text-left py-2 px-2 font-medium">Program</th>
+                        <th className="text-left py-2 px-2 font-medium">Submitted</th>
+                        <th className="text-left py-2 px-2 font-medium">Status</th>
+                        <th className="text-right py-2 px-2 font-medium">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {recentReports.map((r) => (
+                        <tr key={r.id} className="border-b last:border-0 hover:bg-muted/30">
+                          <td className="py-2.5 px-2 font-medium">{r.volunteerName}</td>
+                          <td className="py-2.5 px-2 text-muted-foreground">{r.program}</td>
+                          <td className="py-2.5 px-2 text-muted-foreground">{r.submittedAt}</td>
+                          <td className="py-2.5 px-2">
+                            <Badge variant="outline" className="text-[10px] uppercase">
+                              {r.reviewStatus || 'pending'}
+                            </Badge>
+                          </td>
+                          <td className="py-2.5 px-2 text-right">
+                            <Button size="sm" variant="ghost" className="h-7 text-xs gap-1" onClick={() => setViewReport(r)}>
+                              <Eye className="w-3 h-3" /> View Details
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </CardContent>
           </Card>

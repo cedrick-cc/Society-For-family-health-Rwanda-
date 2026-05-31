@@ -23,11 +23,13 @@ import { cn } from '@/lib/utils';
 import { EmptyState } from '@/components/ui/empty-state';
 import AddVolunteerModal from '@/components/modals/AddVolunteerModal';
 import ScheduleActivityModal from '@/components/modals/ScheduleActivityModal';
-import AddLocationModal from '@/components/modals/AddLocationModal';
 import RegisterBeneficiaryModal from '@/components/modals/RegisterBeneficiaryModal';
 import AssignVolunteersModal from '@/components/modals/AssignVolunteersModal';
 import CreateTaskModal from '@/components/modals/CreateTaskModal';
 import TaskDetailsModal from '@/components/modals/TaskDetailsModal';
+import CalendarModal from '@/components/modals/CalendarModal';
+import AssignedActivitiesCard from '@/components/AssignedActivitiesCard';
+import AnnouncementsCard from '@/components/AnnouncementsCard';
 import { type Program, type Task } from '@/lib/api';
 import {
   getProgramsAsFieldManager,
@@ -73,7 +75,7 @@ const FieldManagerDashboard: React.FC = () => {
   const { user } = useAuth();
   const [showAddVolunteer, setShowAddVolunteer] = useState(false);
   const [showSchedule, setShowSchedule] = useState(false);
-  const [showAddLocation, setShowAddLocation] = useState(false);
+  const [showCalendar, setShowCalendar] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
   const [myPrograms, setMyPrograms] = useState<Program[]>([]);
   const [assignProgramId, setAssignProgramId] = useState<string | null>(null);
@@ -191,7 +193,14 @@ const FieldManagerDashboard: React.FC = () => {
     return 'bg-muted text-muted-foreground border-border';
   };
 
-  const lowRemaining = programResources.filter((r) => r.remaining <= Math.max(1, r.quantityAssigned * 0.2)).length;
+  const activeProgramIds = new Set(
+    myPrograms.filter((p) => p.status === 'planned' || p.status === 'ongoing').map((p) => String(p.id))
+  );
+  const filteredProgramResources = programResources.filter(
+    (r) => !r.programTitle || activeProgramIds.size === 0 || activeProgramIds.has(r.programId)
+  );
+
+  const lowRemaining = filteredProgramResources.filter((r) => r.remaining <= Math.max(1, r.quantityAssigned * 0.2)).length;
 
   const totalFieldVolunteers = assignedVolunteerCount || fieldTeams.reduce((acc, t) => acc + t.members, 0);
   const tasksDone = todayActivities.filter((a) => a.done).length;
@@ -203,7 +212,7 @@ const FieldManagerDashboard: React.FC = () => {
     { title: 'Active deployments', value: String(activeDeployments), sub: `${myPrograms.length} programs assigned`, icon: Radio, color: 'text-success', bg: 'bg-success/10' },
     { title: 'Field Volunteers', value: String(totalFieldVolunteers), sub: totalFieldVolunteers === 0 ? 'None on your programs' : 'Across your assigned programs', icon: Users, color: 'text-primary', bg: 'bg-primary/10' },
     { title: 'Tasks Completed Today', value: `${tasksDone}/${totalTasks}`, sub: totalTasks > 0 ? `${Math.round((tasksDone / totalTasks) * 100)}% completion` : 'No tasks yet', icon: CheckCircle2, color: 'text-secondary', bg: 'bg-secondary/10' },
-    { title: 'Program Resources', value: String(programResources.length), sub: lowRemaining > 0 ? `${lowRemaining} low remaining` : 'Tracked on your programs', icon: Package, color: 'text-warning', bg: 'bg-warning/10' },
+    { title: 'Program Resources', value: String(filteredProgramResources.length), sub: lowRemaining > 0 ? `${lowRemaining} low remaining` : 'Tracked on your programs', icon: Package, color: 'text-warning', bg: 'bg-warning/10' },
   ];
 
   return (
@@ -224,9 +233,9 @@ const FieldManagerDashboard: React.FC = () => {
               {user?.name?.split(' ')[0] || 'User'}, you have <span className="text-primary font-semibold">{totalTasks - tasksDone} tasks</span> pending today across your programs.
             </p>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => setShowAddLocation(true)}>
-              <MapPin className="w-4 h-4" /> Add Location
+          <div className="flex gap-2 flex-wrap">
+            <Button variant="outline" size="sm" onClick={() => setShowCalendar(true)}>
+              <Clock className="w-4 h-4" /> Schedule
             </Button>
             <Button size="sm" onClick={() => setShowSchedule(true)}>
               <Zap className="w-4 h-4" /> Quick Deploy
@@ -234,7 +243,7 @@ const FieldManagerDashboard: React.FC = () => {
           </div>
         </motion.div>
 
-        <motion.div variants={item} className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <motion.div variants={item} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {stats.map((s) => (
             <motion.div key={s.title} whileHover={{ y: -4 }} className="kpi-card">
               <div className="flex items-start justify-between">
@@ -420,6 +429,11 @@ const FieldManagerDashboard: React.FC = () => {
           </Card>
         </motion.div>
 
+        <motion.div variants={item} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <AssignedActivitiesCard />
+          <AnnouncementsCard compact />
+        </motion.div>
+
         <motion.div variants={item} className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <Card className="sfh-card md:col-span-1">
             <CardHeader className="pb-3 flex flex-row items-center justify-between">
@@ -429,8 +443,8 @@ const FieldManagerDashboard: React.FC = () => {
               <Button variant="ghost" size="sm" className="text-xs" onClick={loadDashboard}>Refresh</Button>
             </CardHeader>
             <CardContent>
-              {programResources.length === 0 ? (
-                <EmptyState icon={Package} title="No resources assigned" description="Resources allocated to your programs will appear here." compact />
+              {filteredProgramResources.length === 0 ? (
+                <EmptyState icon={Package} title="No resources assigned" description="Resources allocated to your active programs will appear here." compact />
               ) : (
                 <div className="overflow-x-auto -mx-1">
                   <Table>
@@ -444,7 +458,7 @@ const FieldManagerDashboard: React.FC = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {programResources.map((r) => (
+                      {filteredProgramResources.map((r) => (
                         <TableRow key={`${r.programId}-${r.resourceId}`}>
                           <TableCell className="text-xs font-medium">
                             {r.resourceName}
@@ -481,8 +495,8 @@ const FieldManagerDashboard: React.FC = () => {
               {[
                 { label: 'Add Volunteer', icon: Users, color: 'text-primary', action: () => setShowAddVolunteer(true) },
                 { label: 'Register Beneficiary', icon: ArrowUpRight, color: 'text-secondary', action: () => setShowRegister(true) },
-                { label: 'Add Location', icon: MapPin, color: 'text-accent', action: () => setShowAddLocation(true) },
-                { label: 'Schedule Task', icon: Clock, color: 'text-info', action: () => setShowCreateTask(true) },
+                { label: 'Schedule Activity', icon: Clock, color: 'text-accent', action: () => setShowSchedule(true) },
+                { label: 'Create Task', icon: ListTodo, color: 'text-info', action: () => setShowCreateTask(true) },
               ].map((a) => (
                 <Button key={a.label} variant="outline" className="h-auto py-4 flex-col gap-2" onClick={a.action}>
                   <a.icon className={cn('w-5 h-5', a.color)} />
@@ -496,7 +510,7 @@ const FieldManagerDashboard: React.FC = () => {
 
       <AddVolunteerModal open={showAddVolunteer} onOpenChange={setShowAddVolunteer} />
       <ScheduleActivityModal open={showSchedule} onOpenChange={setShowSchedule} />
-      <AddLocationModal open={showAddLocation} onOpenChange={setShowAddLocation} />
+      <CalendarModal open={showCalendar} onOpenChange={setShowCalendar} />
       <RegisterBeneficiaryModal open={showRegister} onOpenChange={setShowRegister} />
       <AssignVolunteersModal
         open={!!assignProgramId}

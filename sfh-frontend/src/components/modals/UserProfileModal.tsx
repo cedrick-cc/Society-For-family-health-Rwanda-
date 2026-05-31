@@ -28,13 +28,11 @@ import {
   Save,
   X,
   Key,
-  Bell,
   Upload,
   Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { Switch } from '@/components/ui/switch';
 import { changeMyPassword, getMyProfile, updateMyProfile, uploadProfilePhoto } from '@/services/api';
 import { getProfileImageAbsoluteUrl } from '@/lib/profileImage';
 
@@ -62,12 +60,6 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({ open, onOpenChange 
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const [notifications, setNotifications] = useState({
-    email: false,
-    programUpdates: true,
-    volunteerActivity: true,
-  });
 
   const [volunteerProfile, setVolunteerProfile] = useState({
     skills: '',
@@ -98,11 +90,6 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({ open, onOpenChange 
         profileImage: profile.profileImage || '',
       });
       setPreviewUrl(null);
-      setNotifications({
-        email: Boolean(profile.emailNotifications),
-        programUpdates: Boolean(profile.programUpdates),
-        volunteerActivity: Boolean(profile.volunteerActivity),
-      });
       const r = String(profile.role || '').toUpperCase();
       if (r === 'VOLUNTEER') {
         setVolunteerProfile({
@@ -166,21 +153,6 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({ open, onOpenChange 
       toast.error(error instanceof Error ? error.message : 'Failed to update profile.');
     } finally {
       setIsSavingProfile(false);
-    }
-  };
-
-  const handleNotificationToggle = async (key: 'email' | 'programUpdates' | 'volunteerActivity', checked: boolean) => {
-    setNotifications((prev) => ({ ...prev, [key]: checked }));
-    try {
-      await updateMyProfile({
-        emailNotifications: key === 'email' ? checked : notifications.email,
-        programUpdates: key === 'programUpdates' ? checked : notifications.programUpdates,
-        volunteerActivity: key === 'volunteerActivity' ? checked : notifications.volunteerActivity,
-      });
-      toast.success('Preference updated.');
-    } catch (error) {
-      setNotifications((prev) => ({ ...prev, [key]: !checked }));
-      toast.error(error instanceof Error ? error.message : 'Failed to update preferences.');
     }
   };
 
@@ -278,10 +250,9 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({ open, onOpenChange 
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-4">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="profile">Profile</TabsTrigger>
             <TabsTrigger value="security">Security</TabsTrigger>
-            <TabsTrigger value="notifications">Notifications</TabsTrigger>
           </TabsList>
 
           {/* Profile Tab */}
@@ -523,51 +494,6 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({ open, onOpenChange 
             <div className="p-6 border rounded-xl">
               <h4 className="font-medium mb-4">Recent Sessions</h4>
               <p className="text-sm text-muted-foreground">No recent sessions available</p>
-            </div>
-          </TabsContent>
-
-          {/* Notifications Tab */}
-          <TabsContent value="notifications" className="mt-6 space-y-6">
-            <div className="space-y-4">
-              <h4 className="font-medium flex items-center gap-2">
-                <Bell className="w-5 h-5 text-primary" />
-                Notification Preferences
-              </h4>
-
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-4 border rounded-lg">
-                  <div>
-                    <p className="font-medium">Email Notifications</p>
-                    <p className="text-sm text-muted-foreground">Receive notifications via email</p>
-                  </div>
-                  <Switch 
-                    checked={notifications.email} 
-                    onCheckedChange={(checked) => handleNotificationToggle('email', checked)}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between p-4 border rounded-lg">
-                  <div>
-                    <p className="font-medium">Program Updates</p>
-                    <p className="text-sm text-muted-foreground">Get notified when programs are updated</p>
-                  </div>
-                  <Switch 
-                    checked={notifications.programUpdates} 
-                    onCheckedChange={(checked) => handleNotificationToggle('programUpdates', checked)}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between p-4 border rounded-lg">
-                  <div>
-                    <p className="font-medium">Volunteer Activity</p>
-                    <p className="text-sm text-muted-foreground">Get notified about volunteer activities</p>
-                  </div>
-                  <Switch 
-                    checked={notifications.volunteerActivity} 
-                    onCheckedChange={(checked) => handleNotificationToggle('volunteerActivity', checked)}
-                  />
-                </div>
-              </div>
             </div>
           </TabsContent>
         </Tabs>

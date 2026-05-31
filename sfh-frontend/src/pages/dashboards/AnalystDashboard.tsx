@@ -14,6 +14,7 @@ import {
 } from 'recharts';
 import { EmptyChartOverlay } from '@/components/ui/empty-state';
 import GenerateReportModal from '@/components/modals/GenerateReportModal';
+import AnnouncementsCard from '@/components/AnnouncementsCard';
 import { fetchAnalytics, type AnalyticsSummary, emptyAnalytics } from '@/lib/api';
 
 const item = { hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } };
@@ -71,7 +72,7 @@ const AnalystDashboard: React.FC = () => {
           </div>
         </motion.div>
 
-        <motion.div variants={item} className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <motion.div variants={item} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {kpis.map((k) => (
             <motion.div key={k.label} whileHover={{ y: -4 }} className="kpi-card">
               <div className="flex items-start justify-between">
@@ -211,6 +212,10 @@ const AnalystDashboard: React.FC = () => {
               </Button>
             </CardContent>
           </Card>
+        </motion.div>
+
+        <motion.div variants={item}>
+          <AnnouncementsCard showLink />
         </motion.div>
       </motion.div>
 

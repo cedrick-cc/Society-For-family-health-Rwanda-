@@ -36,6 +36,7 @@ type VolunteerRow = {
   volunteerOpsStatus?: string;
   volunteerDistrict?: string | null;
   programCount?: number;
+  isLocalVolunteer?: boolean;
   _count?: { programVolunteers?: number };
 };
 
@@ -220,6 +221,9 @@ const AssignVolunteersModal: React.FC<AssignVolunteersModalProps> = ({
 
             <div className="space-y-3">
               <p className="text-sm font-medium">Available to assign</p>
+              <p className="text-xs text-muted-foreground">
+                Local volunteers (matching program districts) are listed first.
+              </p>
               <div className="flex flex-col sm:flex-row gap-2">
                 <div className="relative flex-1">
                   <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -273,6 +277,11 @@ const AssignVolunteersModal: React.FC<AssignVolunteersModalProps> = ({
                             <p className="text-xs text-muted-foreground mt-0.5">District: {v.volunteerDistrict}</p>
                           )}
                           <div className="flex flex-wrap gap-1 mt-1">
+                            {v.isLocalVolunteer && (
+                              <Badge variant="default" className="text-[10px] font-normal bg-secondary/90">
+                                Local volunteer
+                              </Badge>
+                            )}
                             {v.volunteerOpsStatus && (
                               <Badge
                                 variant="outline"

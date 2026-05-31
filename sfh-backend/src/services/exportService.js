@@ -2,6 +2,7 @@ const { PrismaClient } = require('@prisma/client');
 const { computeProgramStatus } = require('../utils/programStatus');
 const { computeProgramProgress } = require('../utils/programProgress');
 const { parseExportDateRange, createdAtInRange } = require('../utils/exportDateRange');
+const { resolveEvidencePath, readJpegForPdf } = require('../utils/pdfImageEmbed');
 
 const prisma = new PrismaClient();
 
@@ -46,13 +47,26 @@ function wrapText(text, maxChars = 90) {
   return lines;
 }
 
-function toFormattedPdf(title, sections) {
+function toFormattedPdf(title, sections, imageObjects = []) {
   const pageHeight = 792;
+  const pageWidth = 612;
   const marginLeft = 50;
   const lineHeight = 14;
   const fontSize = 10;
   const titleSize = 16;
   let y = pageHeight - 50;
+  let objectId = 6;
+  const xobjects = {};
+  const objectBodies = [];
+
+  imageObjects.forEach((img, idx) => {
+    const name = `Im${idx + 1}`;
+    const id = objectId++;
+    xobjects[name] = id;
+    objectBodies.push(
+      `${id} 0 obj<< /Type /XObject /Subtype /Image /Width ${img.width} /Height ${img.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${img.buffer.length} >>stream\n${img.buffer.toString('binary')}endstream\nendobj`
+    );
+  });
 
   const ensureSpace = (needed) => {
     if (y - needed < 50) y = 40;
@@ -78,6 +92,16 @@ function toFormattedPdf(title, sections) {
         });
       });
       y -= 6;
+    }
+
+    if (section.images) {
+      section.images.forEach((imgRef) => {
+        const imgW = 120;
+        const imgH = 90;
+        ensureSpace(imgH + 20);
+        contentOps.push(`q ${imgW} 0 0 ${imgH} ${marginLeft} ${y - imgH} cm /${imgRef.name} Do Q`);
+        y -= imgH + 14;
+      });
     }
 
     if (section.table) {
@@ -113,26 +137,59 @@ function toFormattedPdf(title, sections) {
   const stream = `${streamBody}\n`;
   const streamLen = Buffer.byteLength(stream, 'utf8');
 
-  return Buffer.from(`%PDF-1.4
+  const xobjDict = Object.keys(xobjects).length
+    ? `/XObject<< ${Object.entries(xobjects).map(([k, v]) => `/${k} ${v} 0 R`).join(' ')} >>`
+    : '';
+
+  const pageObj = `3 0 obj<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Contents 4 0 R /Resources<< /Font<< /F1 5 0 R >> ${xobjDict} >> >>endobj`;
+
+  let pdf = `%PDF-1.4
 1 0 obj<< /Type /Catalog /Pages 2 0 R >>endobj
 2 0 obj<< /Type /Pages /Kids [3 0 R] /Count 1 >>endobj
-3 0 obj<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 ${pageHeight}] /Contents 4 0 R /Resources<< /Font<< /F1 5 0 R >> >> >>endobj
+${pageObj}
 4 0 obj<< /Length ${streamLen} >>stream
 ${stream}endstream
 endobj
 5 0 obj<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>endobj
-xref
-0 6
+`;
+  objectBodies.forEach((body) => {
+    pdf += body + '\n';
+  });
+  pdf += `xref
+0 ${6 + objectBodies.length}
 0000000000 65535 f 
 0000000009 00000 n 
 0000000058 00000 n 
 0000000115 00000 n 
 0000000266 00000 n 
 0000000400 00000 n 
-trailer<< /Size 6 /Root 1 0 R >>
+trailer<< /Size ${6 + objectBodies.length} /Root 1 0 R >>
 startxref
 500
-%%EOF`);
+%%EOF`;
+
+  return Buffer.from(pdf.replace(/\n/g, '\n'), 'binary');
+}
+
+async function resolveFieldReportImages(evidenceUrls, startIndex = 0) {
+  const urls = Array.isArray(evidenceUrls) ? evidenceUrls.slice(0, 4) : [];
+  const lines = [];
+  const images = [];
+  let imgIndex = startIndex;
+
+  for (const url of urls) {
+    const fp = resolveEvidencePath(url);
+    const loaded = readJpegForPdf(fp);
+    if (loaded && loaded.isJpeg) {
+      imgIndex += 1;
+      const name = `Im${imgIndex}`;
+      images.push({ name, buffer: loaded.buffer, width: 400, height: 300 });
+      lines.push(`Evidence photo ${imgIndex - startIndex}: embedded below`);
+    } else {
+      lines.push('Image unavailable');
+    }
+  }
+  return { lines, images, nextIndex: imgIndex };
 }
 
 function emptyReportPdf(title, periodLabel) {
@@ -291,9 +348,10 @@ const COLUMN_MAP = {
   ],
 };
 
-function buildReportPdf(reportType, data, meta) {
+async function buildReportPdf(reportType, data, meta) {
   const generated = new Date().toLocaleString('en-GB');
   const periodLabel = meta?.periodLabel || '';
+  const allImageObjects = [];
 
   switch (reportType) {
     case 'program_summary': {
@@ -310,7 +368,7 @@ function buildReportPdf(reportType, data, meta) {
           ],
         },
       ];
-      programs.forEach((p) => {
+      for (const p of programs) {
         const status = computeProgramStatus(p.startDate, p.endDate);
         const progress = computeProgramProgress({
           status,
@@ -374,8 +432,11 @@ function buildReportPdf(reportType, data, meta) {
             },
           });
         }
-        reports.forEach((fr) => {
-          const imgs = Array.isArray(fr.evidenceUrls) ? fr.evidenceUrls : [];
+        let imageCounter = 0;
+        for (const fr of reports) {
+          const { lines: imgLines, images, nextIndex } = await resolveFieldReportImages(fr.evidenceUrls, imageCounter);
+          imageCounter = nextIndex;
+          allImageObjects.push(...images);
           sections.push({
             heading: 'Field Report',
             lines: [
@@ -384,14 +445,13 @@ function buildReportPdf(reportType, data, meta) {
               `Location: ${fr.location}`,
               `Beneficiaries reached: ${fr.beneficiariesCount}`,
               `Notes: ${(fr.notes || '').slice(0, 300)}`,
-              imgs.length
-                ? `Evidence (${imgs.length}): ${imgs.slice(0, 4).join(', ')}`
-                : 'Evidence: none attached',
+              ...(imgLines.length ? imgLines : ['Evidence: none attached']),
             ],
+            images: images.map((img) => ({ name: img.name })),
           });
-        });
-      });
-      return toFormattedPdf('SFH OMS - Program Summary Report', sections);
+        }
+      }
+      return toFormattedPdf('SFH OMS - Program Summary Report', sections, allImageObjects);
     }
 
     case 'geographic_coverage': {
@@ -650,7 +710,7 @@ async function exportData(entity, format, reportType, dateOpts = {}) {
     return { contentType: 'text/csv', filename: `${entity}.csv`, body: toCsv(rows, columns || []) };
   }
 
-  const pdfReport = buildReportPdf(reportType, rows, meta);
+  const pdfReport = await buildReportPdf(reportType, rows, meta);
   if (pdfReport) {
     return { contentType: 'application/pdf', filename: `${reportType || entity}.pdf`, body: pdfReport };
   }

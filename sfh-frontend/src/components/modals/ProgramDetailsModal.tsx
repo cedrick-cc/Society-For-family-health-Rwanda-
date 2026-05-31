@@ -137,7 +137,7 @@ const ProgramDetailsModal: React.FC<ProgramDetailsModalProps> = ({ open, onOpenC
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[90vh] flex flex-col">
+      <DialogContent className="max-w-lg max-w-[95vw] max-h-[90vh] overflow-y-auto flex flex-col">
         <DialogHeader>
           <DialogTitle className="text-lg font-display pr-8">
             {loading ? 'Program details' : p?.title || 'Program'}

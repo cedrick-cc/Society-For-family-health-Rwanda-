@@ -67,25 +67,57 @@ const SubmitFieldReportModal: React.FC<SubmitFieldReportModalProps> = ({
   };
 
   const captureGPS = () => {
+    if (!window.isSecureContext) {
+      toast.error('GPS requires a secure connection (HTTPS). Enter coordinates manually or use location description.');
+      return;
+    }
     if (!navigator.geolocation) {
       toast.error('Geolocation is not supported by your browser.');
       return;
     }
     setGpsLoading(true);
     setGpsSuccess(false);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setLatitude(pos.coords.latitude.toFixed(6));
-        setLongitude(pos.coords.longitude.toFixed(6));
-        setGpsLoading(false);
-        setGpsSuccess(true);
-        toast.success('Location captured successfully.');
-      },
-      () => {
-        setGpsLoading(false);
+
+    const onSuccess = (pos: GeolocationPosition) => {
+      setLatitude(pos.coords.latitude.toFixed(6));
+      setLongitude(pos.coords.longitude.toFixed(6));
+      setGpsLoading(false);
+      setGpsSuccess(true);
+      toast.success('Location captured successfully.');
+    };
+
+    const onError = (err: GeolocationPositionError, fromWatch = false) => {
+      if (err.code === err.TIMEOUT || err.code === 3) {
+        if (!fromWatch) {
+          toast.warning('GPS timed out. Trying again with lower accuracy…');
+          const watchId = navigator.geolocation.watchPosition(
+            (pos) => {
+              navigator.geolocation.clearWatch(watchId);
+              onSuccess(pos);
+            },
+            (watchErr) => {
+              navigator.geolocation.clearWatch(watchId);
+              onError(watchErr, true);
+            },
+            { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 }
+          );
+          return;
+        }
+        toast.error('GPS timed out. Enter coordinates manually or submit with location description only.');
+      } else if (err.code === err.PERMISSION_DENIED || err.code === 1) {
+        toast.error('Location permission denied. Allow location access in your browser settings, or enter coordinates manually.');
+      } else if (err.code === err.POSITION_UNAVAILABLE || err.code === 2) {
+        toast.error('Location unavailable. Check that GPS/location services are enabled, or enter coordinates manually.');
+      } else {
         toast.warning('Could not capture GPS. You can still submit with location description only.');
-      },
-      { enableHighAccuracy: true, timeout: 10000 }
+      }
+      setGpsLoading(false);
+    };
+
+    navigator.geolocation.getCurrentPosition(
+      onSuccess,
+      (err) => onError(err, false),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
   };
 
@@ -147,7 +179,7 @@ const SubmitFieldReportModal: React.FC<SubmitFieldReportModalProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-w-[95vw] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl font-display">
             <ClipboardList className="w-5 h-5 text-primary" />

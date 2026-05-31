@@ -61,6 +61,12 @@ export async function deactivateUser(id) {
   });
 }
 
+export async function activateUser(id) {
+  return apiRequest(`/users/${id}/activate`, {
+    method: 'PATCH',
+  });
+}
+
 export async function resetUserPassword(id) {
   return apiRequest(`/users/${id}/reset-password`, {
     method: 'PATCH',
@@ -186,8 +192,11 @@ export async function getDashboardStats() {
   return apiRequest('/dashboard/stats');
 }
 
-export async function getFieldManagers() {
-  return apiRequest('/programs/field-managers');
+export async function getFieldManagers(params = {}) {
+  const qs = new URLSearchParams();
+  if (params.availableOnly) qs.set('availableOnly', 'true');
+  const query = qs.toString();
+  return apiRequest(`/programs/field-managers${query ? `?${query}` : ''}`);
 }
 
 export async function getProgramsAsFieldManager() {

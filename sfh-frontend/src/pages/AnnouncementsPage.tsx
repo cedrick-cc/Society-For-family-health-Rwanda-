@@ -55,7 +55,7 @@ const AnnouncementsPage: React.FC = () => {
   const [deleteTarget, setDeleteTarget] = useState<Announcement | null>(null);
   const [form, setForm] = useState({ title: '', message: '', priority: 'normal' as Announcement['priority'] });
 
-  const canManage = user?.role === 'admin' || user?.role === 'coordinator';
+  const canManage = user?.role === 'admin';
 
   const load = useCallback(() => {
     getAnnouncements()

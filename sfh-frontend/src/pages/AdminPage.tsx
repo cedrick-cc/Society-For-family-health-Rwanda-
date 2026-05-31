@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { fetchAuditLogs } from '@/lib/api';
-import { getUsers, getPendingUsers, approveUser, rejectUser, deactivateUser, resetUserPassword, updateUser, getPermissions, updatePermissionValue } from '@/services/api';
+import { getUsers, getPendingUsers, approveUser, rejectUser, deactivateUser, activateUser, resetUserPassword, updateUser, getPermissions, updatePermissionValue } from '@/services/api';
 import { EmptyState } from '@/components/ui/empty-state';
 import { motion } from 'framer-motion';
 import {
@@ -131,6 +131,15 @@ const permissionRoles = [
   { key: 'VOLUNTEER', label: 'Volunteer' },
 ];
 
+const roleTabConfig = [
+  { key: 'administrators', role: 'admin', label: 'Administrators' },
+  { key: 'coordinators', role: 'coordinator', label: 'Coordinators' },
+  { key: 'field_managers', role: 'field_manager', label: 'Field Managers' },
+  { key: 'volunteers', role: 'volunteer', label: 'Volunteers' },
+  { key: 'analysts', role: 'analyst', label: 'Analysts' },
+] as const;
+
+type RoleTabKey = (typeof roleTabConfig)[number]['key'];
 const roleValueOptions = ['ADMIN', 'COORDINATOR', 'FIELD_MANAGER', 'ANALYST', 'VOLUNTEER'] as const;
 const statusValueOptions = ['ACTIVE', 'PENDING', 'INACTIVE'] as const;
 
@@ -156,6 +165,7 @@ const AdminPage: React.FC = () => {
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('users');
+  const [roleUserTab, setRoleUserTab] = useState<RoleTabKey>('administrators');
   const [showAddUser, setShowAddUser] = useState(false);
   const [resetPasswordModal, setResetPasswordModal] = useState<{ open: boolean; email: string; password: string }>({ open: false, email: '', password: '' });
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -297,6 +307,16 @@ const AdminPage: React.FC = () => {
     }
   };
 
+  const handleActivate = async (user: SystemUser) => {
+    try {
+      const response = await activateUser(user.id);
+      toast.success(response.message || `${user.name} activated.`);
+      await refreshUsersData();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to activate user.');
+    }
+  };
+
   const handleResetPassword = async (user: SystemUser) => {
     try {
       const response = await resetUserPassword(user.id);
@@ -368,12 +388,14 @@ const AdminPage: React.FC = () => {
     }
   };
 
-  const filteredUsers = systemUsers.filter(
-    (user) =>
+  const activeRoleTab = roleTabConfig.find((t) => t.key === roleUserTab)!;
+  const filteredUsers = systemUsers.filter((user) => {
+    const matchesRole = user.role === activeRoleTab.role;
+    const matchesSearch =
       user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.role.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+      user.email.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesRole && matchesSearch;
+  });
 
   return (
     <motion.div
@@ -466,72 +488,102 @@ const AdminPage: React.FC = () => {
 
           <AddUserModal open={showAddUser} onOpenChange={setShowAddUser} onUserCreated={refreshUsersData} />
 
-          <Card className="sfh-card overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/50">
-                  <TableHead className="font-semibold">User</TableHead>
-                  <TableHead className="font-semibold">Role</TableHead>
-                  <TableHead className="font-semibold">Department</TableHead>
-                  <TableHead className="font-semibold">Status</TableHead>
-                  <TableHead className="font-semibold">Last Login</TableHead>
-                  <TableHead className="text-right font-semibold">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredUsers.map((user) => (
-                  <TableRow key={user.id} className="hover:bg-muted/30">
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <Avatar className="h-10 w-10">
-                          <AvatarFallback className="bg-primary/10 text-primary font-semibold text-sm">
-                            {user.name
-                              .split(' ')
-                              .map((n) => n[0])
-                              .join('')
-                              .slice(0, 2)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="font-medium">{user.name}</p>
-                          <p className="text-xs text-muted-foreground">{user.email}</p>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">{formatRoleLabel(user.role)}</Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{user.department}</TableCell>
-                    <TableCell>{getStatusBadge(user.status)}</TableCell>
-                    <TableCell className="text-muted-foreground text-sm">{formatLastLogin(user.lastLogin)}</TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <MoreVertical className="w-4 h-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => openEditModal(user)}>
-                            <Edit className="w-4 h-4 mr-2" />
-                            Edit User
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleResetPassword(user)}>
-                            <Key className="w-4 h-4 mr-2" />
-                            Reset Password
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive" onClick={() => handleDeactivate(user)}>
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            Deactivate
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </Card>
+          <Tabs value={roleUserTab} onValueChange={(v) => setRoleUserTab(v as RoleTabKey)} className="w-full">
+            <TabsList className="flex flex-wrap h-auto gap-1 w-full justify-start">
+              {roleTabConfig.map((tab) => (
+                <TabsTrigger key={tab.key} value={tab.key} className="text-xs sm:text-sm">
+                  {tab.label}
+                  <span className="ml-1.5 text-muted-foreground">
+                    ({systemUsers.filter((u) => u.role === tab.role).length})
+                  </span>
+                </TabsTrigger>
+              ))}
+            </TabsList>
+
+            {roleTabConfig.map((tab) => (
+              <TabsContent key={tab.key} value={tab.key} className="mt-4">
+                <Card className="sfh-card overflow-hidden">
+                  <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/50">
+                        <TableHead className="font-semibold">User</TableHead>
+                        <TableHead className="font-semibold">Department</TableHead>
+                        <TableHead className="font-semibold">Status</TableHead>
+                        <TableHead className="font-semibold">Last Login</TableHead>
+                        <TableHead className="text-right font-semibold">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredUsers.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                            No {tab.label.toLowerCase()} found.
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        filteredUsers.map((user) => (
+                          <TableRow key={user.id} className="hover:bg-muted/30">
+                            <TableCell>
+                              <div className="flex items-center gap-3">
+                                <Avatar className="h-10 w-10">
+                                  <AvatarFallback className="bg-primary/10 text-primary font-semibold text-sm">
+                                    {user.name
+                                      .split(' ')
+                                      .map((n) => n[0])
+                                      .join('')
+                                      .slice(0, 2)}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div>
+                                  <p className="font-medium">{user.name}</p>
+                                  <p className="text-xs text-muted-foreground">{user.email}</p>
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">{user.department}</TableCell>
+                            <TableCell>{getStatusBadge(user.status)}</TableCell>
+                            <TableCell className="text-muted-foreground text-sm">{formatLastLogin(user.lastLogin)}</TableCell>
+                            <TableCell className="text-right">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                                    <MoreVertical className="w-4 h-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => openEditModal(user)}>
+                                    <Edit className="w-4 h-4 mr-2" />
+                                    Edit User
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleResetPassword(user)}>
+                                    <Key className="w-4 h-4 mr-2" />
+                                    Reset Password
+                                  </DropdownMenuItem>
+                                  {user.status === 'inactive' ? (
+                                    <DropdownMenuItem onClick={() => handleActivate(user)}>
+                                      <CheckCircle2 className="w-4 h-4 mr-2" />
+                                      Activate
+                                    </DropdownMenuItem>
+                                  ) : (
+                                    <DropdownMenuItem className="text-destructive" onClick={() => handleDeactivate(user)}>
+                                      <Trash2 className="w-4 h-4 mr-2" />
+                                      Deactivate
+                                    </DropdownMenuItem>
+                                  )}
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                  </div>
+                </Card>
+              </TabsContent>
+            ))}
+          </Tabs>
 
           <Card className="sfh-card">
             <CardHeader>

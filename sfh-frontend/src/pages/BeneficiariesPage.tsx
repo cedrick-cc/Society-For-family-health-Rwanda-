@@ -225,7 +225,7 @@ const BeneficiariesPage: React.FC = () => {
       <ScheduleActivityModal open={showScheduleFollowUp} onOpenChange={setShowScheduleFollowUp} />
 
       <Dialog open={profileOpen} onOpenChange={(o) => !o && setProfileOpen(false)}>
-        <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md max-w-[95vw]">
           <DialogHeader>
             <DialogTitle>Beneficiary profile</DialogTitle>
           </DialogHeader>
@@ -365,6 +365,7 @@ const BeneficiariesPage: React.FC = () => {
       </Card>
 
       <Card className="sfh-card overflow-hidden">
+        <div className="overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/50">
@@ -373,8 +374,6 @@ const BeneficiariesPage: React.FC = () => {
               <TableHead className="font-semibold">Services</TableHead>
               <TableHead className="font-semibold">Status</TableHead>
               <TableHead className="font-semibold">Risk</TableHead>
-              <TableHead className="font-semibold">Last Visit</TableHead>
-              <TableHead className="font-semibold">Follow-up</TableHead>
               <TableHead className="text-right font-semibold">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -423,32 +422,6 @@ const BeneficiariesPage: React.FC = () => {
                 </TableCell>
                 <TableCell>{getStatusBadge(beneficiary.status)}</TableCell>
                 <TableCell>{getRiskBadge(beneficiary.riskLevel)}</TableCell>
-                <TableCell>
-                  {beneficiary.lastVisit ? (
-                    <div className="flex items-center gap-1 text-sm">
-                      <Calendar className="w-3 h-3 text-muted-foreground" />
-                      {new Date(beneficiary.lastVisit).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                      })}
-                    </div>
-                  ) : (
-                    <span className="text-sm text-muted-foreground">—</span>
-                  )}
-                </TableCell>
-                <TableCell>
-                  {beneficiary.followUpScheduled ? (
-                    <div className="flex items-center gap-1 text-sm text-primary">
-                      <Clock className="w-3 h-3" />
-                      {new Date(beneficiary.followUpScheduled).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                      })}
-                    </div>
-                  ) : (
-                    <span className="text-sm text-muted-foreground">-</span>
-                  )}
-                </TableCell>
                 <TableCell className="text-right">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -494,6 +467,7 @@ const BeneficiariesPage: React.FC = () => {
             ))}
           </TableBody>
         </Table>
+        </div>
 
         {filteredBeneficiaries.length === 0 && (
           <EmptyState

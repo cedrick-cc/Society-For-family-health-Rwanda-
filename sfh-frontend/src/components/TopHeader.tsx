@@ -6,7 +6,6 @@ import {
   Search,
   LogOut,
   User,
-  Settings,
   ChevronDown,
   Sun,
   Moon,
@@ -352,16 +351,6 @@ const TopHeader: React.FC = () => {
                     >
                       <User className="w-4 h-4 text-primary" />
                       My Profile
-                    </button>
-                    <button 
-                      onClick={() => {
-                        setShowProfileMenu(false);
-                        setShowProfile(true);
-                      }}
-                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm hover:bg-primary/10 transition-colors text-left text-foreground"
-                    >
-                      <Settings className="w-4 h-4 text-primary" />
-                      Account Settings
                     </button>
                   </div>
                   <div className="p-2 border-t">

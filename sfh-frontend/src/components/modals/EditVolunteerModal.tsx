@@ -27,6 +27,7 @@ interface EditVolunteerModalProps {
     id: string | number;
     name: string;
     phone?: string;
+    nationalId?: string;
     district: string;
     skills: string[];
     certifications: string[];
@@ -42,6 +43,7 @@ const EditVolunteerModal: React.FC<EditVolunteerModalProps> = ({
   onSaved,
 }) => {
   const [phone, setPhone] = useState('');
+  const [nationalId, setNationalId] = useState('');
   const [district, setDistrict] = useState('');
   const [skillsText, setSkillsText] = useState('');
   const [certsText, setCertsText] = useState('');
@@ -51,6 +53,7 @@ const EditVolunteerModal: React.FC<EditVolunteerModalProps> = ({
   useEffect(() => {
     if (!open || !volunteer) return;
     setPhone(volunteer.phone && volunteer.phone !== '—' ? volunteer.phone : '');
+    setNationalId(volunteer.nationalId || '');
     setDistrict(volunteer.district || '');
     setSkillsText((volunteer.skills || []).join(', '));
     setCertsText((volunteer.certifications || []).join(', '));
@@ -63,6 +66,7 @@ const EditVolunteerModal: React.FC<EditVolunteerModalProps> = ({
     try {
       await updateVolunteer(String(volunteer.id), {
         phone: phone.trim() || null,
+        nationalId: nationalId.trim() || null,
         volunteerDistrict: district.trim() || null,
         skills: skillsText.split(',').map((s) => s.trim()).filter(Boolean),
         certifications: certsText.split(',').map((s) => s.trim()).filter(Boolean),
@@ -88,6 +92,10 @@ const EditVolunteerModal: React.FC<EditVolunteerModalProps> = ({
           <div className="space-y-2">
             <Label>Phone</Label>
             <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+250..." />
+          </div>
+          <div className="space-y-2">
+            <Label>National ID</Label>
+            <Input value={nationalId} onChange={(e) => setNationalId(e.target.value)} placeholder="16-digit ID" maxLength={16} />
           </div>
           <div className="space-y-2">
             <Label>District</Label>

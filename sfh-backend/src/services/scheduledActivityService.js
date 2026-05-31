@@ -9,6 +9,9 @@ const activityInclude = {
   assignments: {
     include: { volunteer: { select: { id: true, name: true, email: true } } },
   },
+  fieldManagerAssignments: {
+    include: { fieldManager: { select: { id: true, name: true, email: true } } },
+  },
 };
 
 function mapActivity(row) {
@@ -29,11 +32,17 @@ function mapActivity(row) {
       name: a.volunteer.name,
       email: a.volunteer.email,
     })),
+    fieldManagerIds: (row.fieldManagerAssignments || []).map((a) => a.fieldManagerId),
+    fieldManagers: (row.fieldManagerAssignments || []).map((a) => ({
+      id: a.fieldManager.id,
+      name: a.fieldManager.name,
+      email: a.fieldManager.email,
+    })),
   };
 }
 
 async function createActivity(creatorId, payload) {
-  const { title, description, date, time, district, programId, volunteerIds } = payload;
+  const { title, description, date, time, district, programId, volunteerIds, fieldManagerIds } = payload;
   if (!title?.trim() || !date || !time?.trim() || !district?.trim()) {
     throw new Error('Title, date, time, and district are required.');
   }
@@ -43,13 +52,23 @@ async function createActivity(creatorId, payload) {
     throw new Error('Invalid date.');
   }
 
-  const ids = [...new Set((volunteerIds || []).filter(Boolean))];
-  if (ids.length) {
+  const volIds = [...new Set((volunteerIds || []).filter(Boolean))];
+  if (volIds.length) {
     const count = await prisma.user.count({
-      where: { id: { in: ids }, role: 'VOLUNTEER', status: 'ACTIVE' },
+      where: { id: { in: volIds }, role: 'VOLUNTEER', status: 'ACTIVE' },
     });
-    if (count !== ids.length) {
+    if (count !== volIds.length) {
       throw new Error('One or more assigned volunteers are invalid.');
+    }
+  }
+
+  const fmIds = [...new Set((fieldManagerIds || []).filter(Boolean))];
+  if (fmIds.length) {
+    const count = await prisma.user.count({
+      where: { id: { in: fmIds }, role: 'FIELD_MANAGER', status: 'ACTIVE' },
+    });
+    if (count !== fmIds.length) {
+      throw new Error('One or more assigned field managers are invalid.');
     }
   }
 
@@ -62,15 +81,19 @@ async function createActivity(creatorId, payload) {
       district: district.trim(),
       programId: programId || null,
       createdById: creatorId,
-      assignments: ids.length
-        ? { create: ids.map((volunteerId) => ({ volunteerId })) }
+      assignments: volIds.length
+        ? { create: volIds.map((volunteerId) => ({ volunteerId })) }
+        : undefined,
+      fieldManagerAssignments: fmIds.length
+        ? { create: fmIds.map((fieldManagerId) => ({ fieldManagerId })) }
         : undefined,
     },
     include: activityInclude,
   });
 
-  if (ids.length) {
-    await notificationService.notifyMany(ids, {
+  const notifyIds = [...volIds, ...fmIds];
+  if (notifyIds.length) {
+    await notificationService.notifyMany(notifyIds, {
       type: 'SCHEDULED_ACTIVITY',
       category: 'SCHEDULE',
       title: 'New scheduled activity',
@@ -94,10 +117,12 @@ async function listActivities(user) {
         select: { id: true },
       })
     ).map((p) => p.id);
+    where.OR = [
+      { fieldManagerAssignments: { some: { fieldManagerId: user.userId } } },
+      { createdById: user.userId },
+    ];
     if (programIds.length) {
-      where.OR = [{ createdById: user.userId }, { programId: { in: programIds } }];
-    } else {
-      where.createdById = user.userId;
+      where.OR.push({ programId: { in: programIds } });
     }
   } else if (user.role === 'COORDINATOR') {
     const programIds = (
@@ -132,6 +157,12 @@ async function getActivity(id, user) {
     const assigned = row.assignments.some((a) => a.volunteerId === user.userId);
     if (!assigned) throw new Error('Forbidden.');
   }
+  if (user.role === 'FIELD_MANAGER') {
+    const assigned =
+      row.fieldManagerAssignments.some((a) => a.fieldManagerId === user.userId) ||
+      row.createdById === user.userId;
+    if (!assigned) throw new Error('Forbidden.');
+  }
 
   return mapActivity(row);
 }
@@ -162,12 +193,16 @@ async function updateActivity(id, user, payload) {
       await prisma.scheduledActivityVolunteer.createMany({
         data: ids.map((volunteerId) => ({ scheduledActivityId: id, volunteerId })),
       });
-      await notificationService.notifyMany(ids, {
-        type: 'SCHEDULED_ACTIVITY_UPDATED',
-        category: 'SCHEDULE',
-        title: 'Activity schedule updated',
-        body: data.title || existing.title,
-        linkPath: '/dashboard',
+    }
+  }
+
+  const fieldManagerIds = payload.fieldManagerIds;
+  if (fieldManagerIds !== undefined) {
+    const ids = [...new Set((fieldManagerIds || []).filter(Boolean))];
+    await prisma.scheduledActivityFieldManager.deleteMany({ where: { scheduledActivityId: id } });
+    if (ids.length) {
+      await prisma.scheduledActivityFieldManager.createMany({
+        data: ids.map((fieldManagerId) => ({ scheduledActivityId: id, fieldManagerId })),
       });
     }
   }
@@ -177,6 +212,20 @@ async function updateActivity(id, user, payload) {
     data,
     include: activityInclude,
   });
+
+  const notifyIds = [
+    ...row.assignments.map((a) => a.volunteerId),
+    ...(row.fieldManagerAssignments || []).map((a) => a.fieldManagerId),
+  ];
+  if (notifyIds.length) {
+    await notificationService.notifyMany(notifyIds, {
+      type: 'SCHEDULED_ACTIVITY_UPDATED',
+      category: 'SCHEDULE',
+      title: 'Activity schedule updated',
+      body: data.title || existing.title,
+      linkPath: '/dashboard',
+    });
+  }
 
   return mapActivity(row);
 }

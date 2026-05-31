@@ -148,6 +148,51 @@ const deactivateUser = async (req, res) => {
   }
 };
 
+const activateUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const existing = await prisma.user.findUnique({ where: { id }, select: { status: true, email: true } });
+    if (!existing) {
+      return res.status(404).json({ message: 'User not found.' });
+    }
+    if (existing.status === 'ACTIVE') {
+      return res.status(400).json({ message: 'User is already active.' });
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id },
+      data: { status: 'ACTIVE' },
+      select: safeUserSelect,
+    });
+
+    await notificationService.createNotification(id, {
+      type: 'USER_ACTIVATED',
+      category: 'USER',
+      title: 'Account activated',
+      body: 'Your SFH OMS account has been reactivated. You can sign in again.',
+      linkPath: '/login',
+    });
+
+    await auditLogService.logAudit(req, {
+      action: 'USER_ACTIVATION',
+      module: 'USER_MANAGEMENT',
+      description: `Activated user ${updatedUser.email}`,
+      userId: req.user?.userId,
+      userName: req.user?.name,
+      targetType: 'USER',
+      targetId: id,
+    });
+
+    return res.status(200).json({
+      message: 'User activated successfully.',
+      user: updatedUser,
+    });
+  } catch (error) {
+    return res.status(404).json({ message: 'User not found.' });
+  }
+};
+
 const resetUserPassword = async (req, res) => {
   try {
     const { id } = req.params;
@@ -250,6 +295,7 @@ module.exports = {
   approveUser,
   rejectUser,
   deactivateUser,
+  activateUser,
   resetUserPassword,
   updateUser,
 };

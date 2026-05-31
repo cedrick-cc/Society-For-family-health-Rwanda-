@@ -91,18 +91,30 @@ const createProgram = async (data, createdById, req) => {
     title,
     description,
     district,
+    districts,
     sector,
+    sectorsList,
     startDate,
     endDate,
     programType,
     targetBeneficiaries,
+    targetBeneficiaryCategory,
+    minAge,
+    maxAge,
     volunteersNeeded,
     progress,
     fieldManagerId,
     resourceAllocations,
   } = data;
 
-  if (!title || !description || !district) {
+  const districtList = Array.isArray(districts) && districts.length
+    ? districts.map((d) => String(d).trim()).filter(Boolean)
+    : district
+      ? [String(district).trim()]
+      : [];
+  const primaryDistrict = districtList[0] || (district ? String(district).trim() : '');
+
+  if (!title || !description || !primaryDistrict) {
     throw new Error('title, description, and district are required.');
   }
   if (!programType || !VALID_PROGRAM_TYPES.has(programType)) {
@@ -117,17 +129,29 @@ const createProgram = async (data, createdById, req) => {
 
   const status = computeProgramStatus(start, end);
 
+  const sectorArr = Array.isArray(sectorsList) && sectorsList.length
+    ? sectorsList.map((s) => String(s).trim()).filter(Boolean)
+    : sector
+      ? [String(sector).trim()]
+      : [];
+  const primarySector = sectorArr.length ? sectorArr.join(', ') : null;
+
   const row = await prisma.program.create({
     data: {
       title: String(title).trim(),
       description: String(description).trim(),
-      district: String(district).trim(),
-      sector: sector ? String(sector).trim() : null,
+      district: primaryDistrict,
+      districts: districtList,
+      sector: primarySector,
+      sectorsList: sectorArr,
       startDate: start,
       endDate: end,
       status,
       programType,
       targetBeneficiaries: Number(targetBeneficiaries) || 0,
+      targetBeneficiaryCategory: targetBeneficiaryCategory ? String(targetBeneficiaryCategory).trim() : null,
+      minAge: minAge !== undefined && minAge !== null && minAge !== '' ? Number(minAge) : null,
+      maxAge: maxAge !== undefined && maxAge !== null && maxAge !== '' ? Number(maxAge) : null,
       volunteersNeeded: Number(volunteersNeeded) || 0,
       progress: Math.min(100, Math.max(0, Number(progress) || 0)),
       createdById,
@@ -160,6 +184,8 @@ const createProgram = async (data, createdById, req) => {
 };
 
 const listPrograms = async () => {
+  const { releaseVolunteersFromCompletedPrograms } = require('../utils/volunteerOpsSync');
+  await releaseVolunteersFromCompletedPrograms();
   const rows = await prisma.program.findMany({
     include: programInclude,
     orderBy: { startDate: 'desc' },
@@ -209,7 +235,22 @@ const updateProgram = async (id, data, req) => {
   if (data.title !== undefined) payload.title = String(data.title).trim();
   if (data.description !== undefined) payload.description = String(data.description).trim();
   if (data.district !== undefined) payload.district = String(data.district).trim();
+  if (data.districts !== undefined) {
+    payload.districts = Array.isArray(data.districts) ? data.districts.map(String) : [];
+    if (payload.districts.length) payload.district = payload.districts[0];
+  }
   if (data.sector !== undefined) payload.sector = data.sector ? String(data.sector).trim() : null;
+  if (data.sectorsList !== undefined) {
+    payload.sectorsList = Array.isArray(data.sectorsList) ? data.sectorsList.map(String) : [];
+    if (payload.sectorsList.length) payload.sector = payload.sectorsList.join(', ');
+  }
+  if (data.targetBeneficiaryCategory !== undefined) {
+    payload.targetBeneficiaryCategory = data.targetBeneficiaryCategory
+      ? String(data.targetBeneficiaryCategory).trim()
+      : null;
+  }
+  if (data.minAge !== undefined) payload.minAge = data.minAge === null || data.minAge === '' ? null : Number(data.minAge);
+  if (data.maxAge !== undefined) payload.maxAge = data.maxAge === null || data.maxAge === '' ? null : Number(data.maxAge);
   if (data.startDate !== undefined) payload.startDate = parseDate(data.startDate, 'startDate');
   if (data.endDate !== undefined) payload.endDate = parseDate(data.endDate, 'endDate');
   if (data.programType !== undefined) {
@@ -272,12 +313,31 @@ const deleteProgram = async (id) => {
   return { message: 'Program deleted successfully.' };
 };
 
-const listFieldManagers = async () => {
-  return prisma.user.findMany({
+const listFieldManagers = async ({ availableOnly } = {}) => {
+  const managers = await prisma.user.findMany({
     where: { role: 'FIELD_MANAGER', status: 'ACTIVE' },
-    select: { id: true, name: true, email: true, department: true },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      department: true,
+      managedPrograms: { select: { id: true, startDate: true, endDate: true } },
+    },
     orderBy: { name: 'asc' },
   });
+
+  const mapped = managers.map(({ managedPrograms, ...fm }) => {
+    const hasActiveProgram = (managedPrograms || []).some((p) => {
+      const st = computeProgramStatus(p.startDate, p.endDate);
+      return st === 'PLANNED' || st === 'ONGOING';
+    });
+    return { ...fm, hasActiveProgram };
+  });
+
+  if (availableOnly) {
+    return mapped.filter((fm) => !fm.hasActiveProgram).map(({ hasActiveProgram, ...fm }) => fm);
+  }
+  return mapped.map(({ hasActiveProgram, ...fm }) => ({ ...fm, hasActiveProgram }));
 };
 
 module.exports = {

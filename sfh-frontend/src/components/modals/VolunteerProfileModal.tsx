@@ -8,21 +8,30 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, MapPin, Mail, Phone, Award, ClipboardList, FileText } from 'lucide-react';
+import { Loader2, MapPin, Mail, Phone, Award, ClipboardList, FileText, IdCard, Calendar } from 'lucide-react';
 import { getVolunteerDetail } from '@/services/api';
+import UserAvatar from '@/components/UserAvatar';
 
 export type VolunteerProfileData = {
   id: string;
   name: string;
   email: string;
   phone?: string | null;
+  phoneNumber?: string | null;
+  nationalId?: string | null;
+  profileImage?: string | null;
   volunteerDistrict?: string | null;
   status: string;
   volunteerOpsStatus?: string;
   skills: string[];
   certifications: string[];
   programsParticipated?: number;
+  programsAssigned?: number;
+  programsCompleted?: number;
+  fieldReportsSubmitted?: number;
   beneficiariesServed?: number;
+  registrationDate?: string;
+  joinDate?: string;
   bio?: string | null;
   assignedPrograms?: Array<{ id: string; title: string; status: string; district: string }>;
   completedTasks?: Array<{ id: string; title: string }>;
@@ -74,12 +83,27 @@ const VolunteerProfileModal: React.FC<VolunteerProfileModalProps> = ({
     };
   }, [open, volunteerId]);
 
-  const programsCount = data?.programsParticipated ?? data?.assignedPrograms?.length ?? 0;
+  const phone = data?.phoneNumber ?? data?.phone;
+  const registrationDate = data?.registrationDate ?? data?.joinDate;
+  const programsAssigned = data?.programsAssigned ?? data?.assignedPrograms?.length ?? 0;
+  const programsCompleted = data?.programsCompleted ?? 0;
+  const fieldReportsCount = data?.fieldReportsSubmitted ?? data?.fieldReports?.length ?? 0;
   const served = data?.beneficiariesServed ?? 0;
+
+  const avatarUser = data
+    ? {
+        id: data.id,
+        name: data.name,
+        email: data.email,
+        role: 'volunteer' as const,
+        department: '',
+        profileImage: data.profileImage || undefined,
+      }
+    : null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[90vh] flex flex-col p-0 gap-0">
+      <DialogContent className="max-w-lg max-w-[95vw] max-h-[90vh] flex flex-col p-0 gap-0">
         <DialogHeader className="px-6 pt-6 pb-2 shrink-0">
           <DialogTitle className="text-lg font-display pr-8">
             {loading ? 'Volunteer profile' : data?.name || 'Volunteer'}
@@ -95,36 +119,69 @@ const VolunteerProfileModal: React.FC<VolunteerProfileModalProps> = ({
         {!loading && data && (
           <ScrollArea className="flex-1 min-h-0 max-h-[calc(90vh-7rem)] px-6">
             <div className="space-y-4 text-sm pb-6">
-              <div className="flex flex-wrap gap-2">
-                <Badge variant="outline" className="capitalize">{String(data.status).toLowerCase()}</Badge>
-                {data.volunteerOpsStatus && (
-                  <Badge variant="secondary" className="capitalize">
-                    {String(data.volunteerOpsStatus).replace(/_/g, ' ').toLowerCase()}
-                  </Badge>
+              <div className="flex items-center gap-4">
+                {avatarUser && (
+                  <UserAvatar
+                    user={avatarUser}
+                    sizeClass="h-16 w-16"
+                    className="ring-2 ring-primary/20"
+                  />
                 )}
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant="outline" className="capitalize">{String(data.status).toLowerCase()}</Badge>
+                  {data.volunteerOpsStatus && (
+                    <Badge variant="secondary" className="capitalize">
+                      {String(data.volunteerOpsStatus).replace(/_/g, ' ').toLowerCase()}
+                    </Badge>
+                  )}
+                </div>
               </div>
 
               <div className="space-y-1.5 text-muted-foreground">
                 <p className="flex items-center gap-2"><Mail className="w-4 h-4" />{data.email}</p>
-                {data.phone && (
-                  <p className="flex items-center gap-2"><Phone className="w-4 h-4" />{data.phone}</p>
+                {phone && (
+                  <p className="flex items-center gap-2"><Phone className="w-4 h-4" />{phone}</p>
+                )}
+                {data.nationalId && (
+                  <p className="flex items-center gap-2"><IdCard className="w-4 h-4" />{data.nationalId}</p>
                 )}
                 <p className="flex items-center gap-2">
                   <MapPin className="w-4 h-4" />
                   {data.volunteerDistrict || '—'}
                 </p>
+                {registrationDate && (
+                  <p className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4" />
+                    Registered {new Date(registrationDate).toLocaleDateString()}
+                  </p>
+                )}
               </div>
 
-              <div className="grid grid-cols-2 gap-3 pt-2 border-t">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 border-t">
                 <div className="text-center p-2 rounded-lg bg-muted/50">
-                  <p className="text-lg font-semibold">{programsCount}</p>
-                  <p className="text-xs text-muted-foreground">Programs</p>
+                  <p className="text-lg font-semibold">{programsAssigned}</p>
+                  <p className="text-xs text-muted-foreground">Assigned</p>
+                </div>
+                <div className="text-center p-2 rounded-lg bg-muted/50">
+                  <p className="text-lg font-semibold">{programsCompleted}</p>
+                  <p className="text-xs text-muted-foreground">Completed</p>
+                </div>
+                <div className="text-center p-2 rounded-lg bg-muted/50">
+                  <p className="text-lg font-semibold">{fieldReportsCount}</p>
+                  <p className="text-xs text-muted-foreground">Reports</p>
                 </div>
                 <div className="text-center p-2 rounded-lg bg-muted/50">
                   <p className="text-lg font-semibold">{served}</p>
                   <p className="text-xs text-muted-foreground">Served</p>
                 </div>
               </div>
+
+              {data.bio && (
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Bio</p>
+                  <p className="text-sm text-muted-foreground">{data.bio}</p>
+                </div>
+              )}
 
               {data.skills?.length > 0 && (
                 <div>
@@ -183,7 +240,7 @@ const VolunteerProfileModal: React.FC<VolunteerProfileModalProps> = ({
 
               <div>
                 <p className="text-xs font-semibold text-muted-foreground uppercase mb-2 flex items-center gap-1">
-                  <FileText className="w-3.5 h-3.5" /> Field reports
+                  <FileText className="w-3.5 h-3.5" /> Field reports ({fieldReportsCount})
                 </p>
                 {(data.fieldReports || []).length === 0 ? (
                   <p className="text-xs text-muted-foreground">No reports submitted.</p>

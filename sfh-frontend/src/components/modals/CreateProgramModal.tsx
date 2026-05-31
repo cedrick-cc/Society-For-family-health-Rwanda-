@@ -19,6 +19,11 @@ import {
   PROGRAM_TYPE_LABELS,
   type ProgramTypeKey,
 } from '@/lib/programResources';
+import {
+  RWANDA_DISTRICTS,
+  BENEFICIARY_CATEGORIES,
+  getSectorsForDistricts,
+} from '@/lib/rwandaDistricts';
 import { toast } from '@/hooks/use-toast';
 
 export interface CreateProgramModalProps {
@@ -36,13 +41,6 @@ const steps = [
   { id: 5, title: 'Review', icon: CheckCircle2 },
 ];
 
-const districts = [
-  'Kigali City', 'Bugesera', 'Gatsibo', 'Kayonza', 'Kirehe', 'Ngoma', 'Nyagatare', 'Rwamagana',
-  'Burera', 'Gakenke', 'Gicumbi', 'Musanze', 'Rulindo', 'Gisagara', 'Huye', 'Kamonyi',
-  'Muhanga', 'Nyamagabe', 'Nyanza', 'Nyaruguru', 'Ruhango', 'Karongi', 'Ngororero',
-  'Nyabihu', 'Nyamasheke', 'Rubavu', 'Rusizi', 'Rutsiro',
-];
-
 const PROGRAM_TYPE_KEYS = Object.keys(PROGRAM_TYPE_LABELS) as ProgramTypeKey[];
 
 const emptyForm = () => ({
@@ -52,9 +50,12 @@ const emptyForm = () => ({
   objectives: '',
   startDate: undefined as Date | undefined,
   endDate: undefined as Date | undefined,
-  district: '',
-  sectors: '',
+  selectedDistricts: [] as string[],
+  selectedSectors: [] as string[],
   targetBeneficiaries: '',
+  targetBeneficiaryCategory: '',
+  minAge: '',
+  maxAge: '',
   fieldManagerId: '',
   teamLead: '',
   volunteersNeeded: '',
@@ -70,6 +71,12 @@ function buildDescription(formData: ReturnType<typeof emptyForm>) {
   return chunks.join('\n\n') || 'No description provided.';
 }
 
+function suggestResourceQty(targetBeneficiaries: number): number {
+  const target = Number(targetBeneficiaries) || 0;
+  if (target <= 0) return 0;
+  return Math.max(1, target);
+}
+
 const CreateProgramModal: React.FC<CreateProgramModalProps> = ({
   open,
   onOpenChange,
@@ -80,16 +87,24 @@ const CreateProgramModal: React.FC<CreateProgramModalProps> = ({
   const [formData, setFormData] = useState(emptyForm);
   const [selectedResources, setSelectedResources] = useState<string[]>([]);
   const [resourceQty, setResourceQty] = useState<Record<string, string>>({});
+  const [manualQtyKeys, setManualQtyKeys] = useState<Set<string>>(new Set());
   const [inventoryItems, setInventoryItems] = useState<Array<{ id: string; resourceKey?: string; name: string }>>([]);
   const [fieldManagers, setFieldManagers] = useState<Array<{ id: string; name: string; email: string }>>([]);
   const [submitting, setSubmitting] = useState(false);
+
+  const availableSectors = useMemo(
+    () => getSectorsForDistricts(formData.selectedDistricts),
+    [formData.selectedDistricts]
+  );
 
   const resourceOptions = useMemo(() => {
     if (!formData.programType) return [];
     return HEALTH_RESOURCES_BY_TYPE[formData.programType as ProgramTypeKey] || [];
   }, [formData.programType]);
 
-  const updateFormData = (field: string, value: string | Date | undefined) => {
+  const targetBeneficiariesNum = Number(formData.targetBeneficiaries) || 0;
+
+  const updateFormData = (field: string, value: string | Date | undefined | string[]) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -97,7 +112,7 @@ const CreateProgramModal: React.FC<CreateProgramModalProps> = ({
     if (!open) return;
     (async () => {
       try {
-        const raw = await getFieldManagers();
+        const raw = await getFieldManagers({ availableOnly: true });
         const list = Array.isArray(raw) ? raw : [];
         setFieldManagers(list.map((u: { id: string; name: string; email: string }) => ({ id: u.id, name: u.name, email: u.email })));
       } catch {
@@ -123,13 +138,37 @@ const CreateProgramModal: React.FC<CreateProgramModalProps> = ({
   }, [formData.programType]);
 
   useEffect(() => {
+    if (targetBeneficiariesNum <= 0) return;
+    setResourceQty((prev) => {
+      const next = { ...prev };
+      selectedResources.forEach((key) => {
+        if (!manualQtyKeys.has(key)) {
+          next[key] = String(suggestResourceQty(targetBeneficiariesNum));
+        }
+      });
+      return next;
+    });
+  }, [targetBeneficiariesNum, selectedResources, manualQtyKeys]);
+
+  useEffect(() => {
     if (!open) {
       setCurrentStep(1);
       setSubmitting(false);
+      setManualQtyKeys(new Set());
       return;
     }
     if (programToEdit) {
       setCurrentStep(1);
+      const districts = Array.isArray((programToEdit as ApiProgram & { districts?: string[] }).districts)
+        ? (programToEdit as ApiProgram & { districts?: string[] }).districts!
+        : programToEdit.district
+          ? [programToEdit.district]
+          : [];
+      const sectors = Array.isArray((programToEdit as ApiProgram & { sectorsList?: string[] }).sectorsList)
+        ? (programToEdit as ApiProgram & { sectorsList?: string[] }).sectorsList!
+        : programToEdit.sector
+          ? programToEdit.sector.split(',').map((s) => s.trim()).filter(Boolean)
+          : [];
       setFormData({
         name: programToEdit.title || '',
         programType: (programToEdit.programType as ProgramTypeKey) || '',
@@ -137,9 +176,12 @@ const CreateProgramModal: React.FC<CreateProgramModalProps> = ({
         objectives: '',
         startDate: programToEdit.startDate ? new Date(programToEdit.startDate) : undefined,
         endDate: programToEdit.endDate ? new Date(programToEdit.endDate) : undefined,
-        district: programToEdit.district || '',
-        sectors: programToEdit.sector || '',
+        selectedDistricts: districts,
+        selectedSectors: sectors,
         targetBeneficiaries: String(programToEdit.targetBeneficiaries ?? ''),
+        targetBeneficiaryCategory: (programToEdit as ApiProgram & { targetBeneficiaryCategory?: string }).targetBeneficiaryCategory || '',
+        minAge: String((programToEdit as ApiProgram & { minAge?: number }).minAge ?? ''),
+        maxAge: String((programToEdit as ApiProgram & { maxAge?: number }).maxAge ?? ''),
         fieldManagerId: programToEdit.fieldManagerId || '',
         teamLead: '',
         volunteersNeeded: String(programToEdit.volunteersNeeded ?? programToEdit.volunteersRequired ?? ''),
@@ -154,14 +196,40 @@ const CreateProgramModal: React.FC<CreateProgramModalProps> = ({
         if (x.resource?.resourceKey) qtyMap[x.resource.resourceKey] = String(x.quantityAssigned ?? 0);
       });
       setResourceQty(qtyMap);
+      setManualQtyKeys(new Set(Object.keys(qtyMap)));
     } else {
       setFormData(emptyForm());
       setSelectedResources([]);
+      setResourceQty({});
+      setManualQtyKeys(new Set());
       setCurrentStep(1);
     }
   }, [open, programToEdit]);
 
   const progress = (currentStep / steps.length) * 100;
+
+  const toggleDistrict = (district: string) => {
+    setFormData((prev) => {
+      const next = prev.selectedDistricts.includes(district)
+        ? prev.selectedDistricts.filter((d) => d !== district)
+        : [...prev.selectedDistricts, district];
+      const validSectors = getSectorsForDistricts(next);
+      return {
+        ...prev,
+        selectedDistricts: next,
+        selectedSectors: prev.selectedSectors.filter((s) => validSectors.includes(s)),
+      };
+    });
+  };
+
+  const toggleSector = (sector: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      selectedSectors: prev.selectedSectors.includes(sector)
+        ? prev.selectedSectors.filter((s) => s !== sector)
+        : [...prev.selectedSectors, sector],
+    }));
+  };
 
   const canProceed = () => {
     switch (currentStep) {
@@ -170,7 +238,7 @@ const CreateProgramModal: React.FC<CreateProgramModalProps> = ({
       case 2:
         return Boolean(formData.startDate && formData.endDate);
       case 3:
-        return Boolean(formData.district);
+        return formData.selectedDistricts.length > 0;
       case 4: {
         const n = Number(formData.volunteersNeeded);
         return Boolean(
@@ -186,9 +254,14 @@ const CreateProgramModal: React.FC<CreateProgramModalProps> = ({
   };
 
   const toggleResource = (key: string) => {
-    setSelectedResources((prev) =>
-      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
-    );
+    setSelectedResources((prev) => {
+      const adding = !prev.includes(key);
+      const next = adding ? [...prev, key] : prev.filter((k) => k !== key);
+      if (adding && targetBeneficiariesNum > 0 && !manualQtyKeys.has(key)) {
+        setResourceQty((q) => ({ ...q, [key]: String(suggestResourceQty(targetBeneficiariesNum)) }));
+      }
+      return next;
+    });
   };
 
   const buildPayload = () => {
@@ -203,13 +276,18 @@ const CreateProgramModal: React.FC<CreateProgramModalProps> = ({
     return {
       title: formData.name.trim(),
       description: buildDescription(formData),
-      district: formData.district.trim(),
-      sector: formData.sectors.trim() || null,
+      district: formData.selectedDistricts[0]?.trim() || '',
+      districts: formData.selectedDistricts,
+      sector: formData.selectedSectors.join(', ') || null,
+      sectorsList: formData.selectedSectors,
       startDate: formData.startDate!.toISOString(),
       endDate: formData.endDate!.toISOString(),
       programType: formData.programType,
       fieldManagerId: formData.fieldManagerId,
       targetBeneficiaries: Number(formData.targetBeneficiaries) || 0,
+      targetBeneficiaryCategory: formData.targetBeneficiaryCategory.trim() || null,
+      minAge: formData.minAge !== '' ? Number(formData.minAge) : null,
+      maxAge: formData.maxAge !== '' ? Number(formData.maxAge) : null,
       volunteersNeeded: Math.max(0, Number(formData.volunteersNeeded) || 0),
       resourceAllocations,
     };
@@ -259,7 +337,7 @@ const CreateProgramModal: React.FC<CreateProgramModalProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col overflow-hidden p-0">
+      <DialogContent className="max-w-2xl max-w-[95vw] max-h-[85vh] flex flex-col overflow-hidden p-0">
         <div className="px-6 pt-6 pb-0">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-xl font-display">
@@ -357,17 +435,17 @@ const CreateProgramModal: React.FC<CreateProgramModalProps> = ({
 
           {currentStep === 2 && (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Start Date *</Label>
-                  <Popover>
+                  <Popover modal={false}>
                     <PopoverTrigger asChild>
                       <Button variant="outline" className="w-full justify-start text-left font-normal">
                         <CalendarIcon className="mr-2 h-4 w-4" />
                         {formData.startDate ? format(formData.startDate, 'PPP') : 'Select date'}
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
+                    <PopoverContent className="w-auto p-0" align="start" side="bottom">
                       <Calendar
                         mode="single"
                         selected={formData.startDate}
@@ -379,14 +457,14 @@ const CreateProgramModal: React.FC<CreateProgramModalProps> = ({
                 </div>
                 <div className="space-y-2">
                   <Label>End Date *</Label>
-                  <Popover>
+                  <Popover modal={false}>
                     <PopoverTrigger asChild>
                       <Button variant="outline" className="w-full justify-start text-left font-normal">
                         <CalendarIcon className="mr-2 h-4 w-4" />
                         {formData.endDate ? format(formData.endDate, 'PPP') : 'Select date'}
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
+                    <PopoverContent className="w-auto p-0" align="start" side="bottom">
                       <Calendar
                         mode="single"
                         selected={formData.endDate}
@@ -414,26 +492,39 @@ const CreateProgramModal: React.FC<CreateProgramModalProps> = ({
           {currentStep === 3 && (
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label>District *</Label>
-                <Select value={formData.district} onValueChange={(v) => updateFormData('district', v)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select district" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {districts.map((district) => (
-                      <SelectItem key={district} value={district}>{district}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label>Districts *</Label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto border rounded-lg p-3">
+                  {RWANDA_DISTRICTS.map((district) => (
+                    <label key={district} className="flex items-center gap-2 text-sm cursor-pointer">
+                      <Checkbox
+                        checked={formData.selectedDistricts.includes(district)}
+                        onCheckedChange={() => toggleDistrict(district)}
+                      />
+                      {district}
+                    </label>
+                  ))}
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label>Sectors / Areas</Label>
-                <Input
-                  placeholder="e.g., Gasabo, Kicukiro, Nyarugenge"
-                  value={formData.sectors}
-                  onChange={(e) => updateFormData('sectors', e.target.value)}
-                />
-              </div>
+              {formData.selectedDistricts.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Sectors / Areas</Label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-40 overflow-y-auto border rounded-lg p-3">
+                    {availableSectors.length === 0 ? (
+                      <p className="text-xs text-muted-foreground col-span-2">No sectors listed for selected districts.</p>
+                    ) : (
+                      availableSectors.map((sector) => (
+                        <label key={sector} className="flex items-center gap-2 text-sm cursor-pointer">
+                          <Checkbox
+                            checked={formData.selectedSectors.includes(sector)}
+                            onCheckedChange={() => toggleSector(sector)}
+                          />
+                          {sector}
+                        </label>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
               <div className="space-y-2">
                 <Label>Target Beneficiaries</Label>
                 <Input
@@ -443,6 +534,46 @@ const CreateProgramModal: React.FC<CreateProgramModalProps> = ({
                   value={formData.targetBeneficiaries}
                   onChange={(e) => updateFormData('targetBeneficiaries', e.target.value)}
                 />
+              </div>
+              <div className="space-y-2">
+                <Label>Target beneficiary category</Label>
+                <Select
+                  value={formData.targetBeneficiaryCategory}
+                  onValueChange={(v) => updateFormData('targetBeneficiaryCategory', v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select category (optional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {BENEFICIARY_CATEGORIES.map((cat) => (
+                      <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Minimum age</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={130}
+                    placeholder="e.g., 18"
+                    value={formData.minAge}
+                    onChange={(e) => updateFormData('minAge', e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Maximum age</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={130}
+                    placeholder="e.g., 49"
+                    value={formData.maxAge}
+                    onChange={(e) => updateFormData('maxAge', e.target.value)}
+                  />
+                </div>
               </div>
             </div>
           )}
@@ -464,7 +595,7 @@ const CreateProgramModal: React.FC<CreateProgramModalProps> = ({
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  The field manager deploys volunteers to this program. Coordinators do not assign individual volunteers here.
+                  Only field managers not currently assigned to an active program are shown.
                 </p>
               </div>
               <div className="space-y-2">
@@ -494,33 +625,42 @@ const CreateProgramModal: React.FC<CreateProgramModalProps> = ({
                 {!formData.programType ? (
                   <p className="text-sm text-muted-foreground">Choose a program type in step 1 to see resource options.</p>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-56 overflow-y-auto pr-1">
-                    {resourceOptions.map((opt) => (
-                      <label
-                        key={opt.key}
-                        className="flex items-center gap-2 rounded-lg border p-2 cursor-pointer hover:bg-muted/50 text-sm"
-                      >
-                        <Checkbox
-                          checked={selectedResources.includes(opt.key)}
-                          onCheckedChange={() => toggleResource(opt.key)}
-                        />
-                        <span className="flex-1">{opt.label}</span>
-                        {selectedResources.includes(opt.key) ? (
-                          <Input
-                            type="number"
-                            min={1}
-                            className="w-20 h-8"
-                            placeholder="Qty"
-                            value={resourceQty[opt.key] || ''}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={(e) =>
-                              setResourceQty((prev) => ({ ...prev, [opt.key]: e.target.value }))
-                            }
+                  <>
+                    {targetBeneficiariesNum > 0 && (
+                      <p className="text-xs text-muted-foreground mb-3">
+                        Quantities are suggested as 1 unit per target beneficiary ({targetBeneficiariesNum.toLocaleString()}).
+                        You can override any value manually.
+                      </p>
+                    )}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-56 overflow-y-auto pr-1">
+                      {resourceOptions.map((opt) => (
+                        <label
+                          key={opt.key}
+                          className="flex items-center gap-2 rounded-lg border p-2 cursor-pointer hover:bg-muted/50 text-sm"
+                        >
+                          <Checkbox
+                            checked={selectedResources.includes(opt.key)}
+                            onCheckedChange={() => toggleResource(opt.key)}
                           />
-                        ) : null}
-                      </label>
-                    ))}
-                  </div>
+                          <span className="flex-1">{opt.label}</span>
+                          {selectedResources.includes(opt.key) ? (
+                            <Input
+                              type="number"
+                              min={1}
+                              className="w-20 h-8"
+                              placeholder="Qty"
+                              value={resourceQty[opt.key] || ''}
+                              onClick={(e) => e.stopPropagation()}
+                              onChange={(e) => {
+                                setManualQtyKeys((prev) => new Set(prev).add(opt.key));
+                                setResourceQty((prev) => ({ ...prev, [opt.key]: e.target.value }));
+                              }}
+                            />
+                          ) : null}
+                        </label>
+                      ))}
+                    </div>
+                  </>
                 )}
               </div>
 
@@ -538,7 +678,7 @@ const CreateProgramModal: React.FC<CreateProgramModalProps> = ({
           {currentStep === 5 && (
             <div className="space-y-4">
               <h3 className="font-semibold text-lg">Review Program Details</h3>
-              <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                 <div className="p-3 rounded-lg bg-muted/50">
                   <p className="text-muted-foreground">Program Name</p>
                   <p className="font-medium">{formData.name || '-'}</p>
@@ -554,9 +694,23 @@ const CreateProgramModal: React.FC<CreateProgramModalProps> = ({
                   <p className="font-medium">{formData.startDate ? format(formData.startDate, 'PPP') : '-'}</p>
                 </div>
                 <div className="p-3 rounded-lg bg-muted/50">
-                  <p className="text-muted-foreground">District</p>
-                  <p className="font-medium">{formData.district || '-'}</p>
+                  <p className="text-muted-foreground">Districts</p>
+                  <p className="font-medium">{formData.selectedDistricts.join(', ') || '-'}</p>
                 </div>
+                {formData.targetBeneficiaryCategory && (
+                  <div className="p-3 rounded-lg bg-muted/50">
+                    <p className="text-muted-foreground">Beneficiary category</p>
+                    <p className="font-medium">{formData.targetBeneficiaryCategory}</p>
+                  </div>
+                )}
+                {(formData.minAge || formData.maxAge) && (
+                  <div className="p-3 rounded-lg bg-muted/50">
+                    <p className="text-muted-foreground">Age range</p>
+                    <p className="font-medium">
+                      {formData.minAge || '—'} – {formData.maxAge || '—'}
+                    </p>
+                  </div>
+                )}
                 <div className="p-3 rounded-lg bg-muted/50">
                   <p className="text-muted-foreground">Field manager</p>
                   <p className="font-medium">{fmName || '-'}</p>

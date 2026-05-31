@@ -1,9 +1,21 @@
 const { PrismaClient } = require('@prisma/client');
+const { computeProgramStatus } = require('../utils/programStatus');
 
 const prisma = new PrismaClient();
 
 function mapVolunteerSummary(v) {
   const programs = v.programVolunteers || [];
+  const activePrograms = programs.filter((pv) => {
+    const p = pv.program;
+    if (!p) return false;
+    const st = computeProgramStatus(p.startDate, p.endDate);
+    return st === 'PLANNED' || st === 'ONGOING';
+  });
+  const completedPrograms = programs.filter((pv) => {
+    const p = pv.program;
+    if (!p) return false;
+    return computeProgramStatus(p.startDate, p.endDate) === 'COMPLETED';
+  });
   const completedTasks = (v.assignedTasks || []).filter((t) => t.status === 'COMPLETED').length;
   const pendingTasks = (v.assignedTasks || []).filter((t) =>
     ['PENDING', 'IN_PROGRESS'].includes(t.status)
@@ -15,13 +27,15 @@ function mapVolunteerSummary(v) {
     0
   );
   const beneficiariesRegistered = (v.beneficiariesCreated || []).length;
-  const currentProgram = programs.find((pv) => pv.program)?.program?.title;
+  const currentProgram = activePrograms.find((pv) => pv.program)?.program?.title;
 
   return {
     id: v.id,
     name: v.name,
     email: v.email,
     phone: v.phone || null,
+    phoneNumber: v.phone || null,
+    nationalId: v.nationalId || null,
     status: v.status,
     profileImage: v.profileImage,
     skills: v.skills,
@@ -29,9 +43,11 @@ function mapVolunteerSummary(v) {
     volunteerOpsStatus: v.volunteerOpsStatus,
     volunteerDistrict: v.volunteerDistrict,
     joinDate: v.createdAt,
-    assignedProgramsCount: programs.length,
+    registrationDate: v.createdAt,
+    assignedProgramsCount: activePrograms.length,
     programsParticipated: programs.length,
-    programsCompleted: programs.length,
+    programsCompleted: completedPrograms.length,
+    programsAssigned: activePrograms.length,
     tasksCompleted: completedTasks,
     pendingTasks,
     fieldReportsSubmitted: reportsSubmitted,
@@ -69,6 +85,7 @@ async function listVolunteers({ search, status, opsStatus } = {}) {
       name: true,
       email: true,
       phone: true,
+      nationalId: true,
       status: true,
       profileImage: true,
       skills: true,
@@ -78,7 +95,7 @@ async function listVolunteers({ search, status, opsStatus } = {}) {
       createdAt: true,
       programVolunteers: {
         include: {
-          program: { select: { id: true, title: true, status: true } },
+          program: { select: { id: true, title: true, status: true, startDate: true, endDate: true } },
         },
       },
       assignedTasks: {
@@ -105,6 +122,7 @@ async function getVolunteerDetail(volunteerId) {
       name: true,
       email: true,
       phone: true,
+      nationalId: true,
       status: true,
       profileImage: true,
       skills: true,
@@ -207,6 +225,7 @@ async function updateVolunteer(volunteerId, data) {
 
   const payload = {};
   if (data.phone !== undefined) payload.phone = data.phone ? String(data.phone).trim() : null;
+  if (data.nationalId !== undefined) payload.nationalId = data.nationalId ? String(data.nationalId).trim() : null;
   if (data.volunteerDistrict !== undefined) {
     payload.volunteerDistrict = data.volunteerDistrict ? String(data.volunteerDistrict).trim() : null;
   }
@@ -234,6 +253,7 @@ async function updateVolunteer(volunteerId, data) {
       name: true,
       email: true,
       phone: true,
+      nationalId: true,
       status: true,
       profileImage: true,
       skills: true,

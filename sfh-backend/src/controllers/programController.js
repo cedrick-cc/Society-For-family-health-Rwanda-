@@ -24,7 +24,8 @@ const list = async (req, res) => {
 
 const listFieldManagers = async (req, res) => {
   try {
-    const users = await programService.listFieldManagers();
+    const availableOnly = req.query.availableOnly === 'true' || req.query.availableOnly === '1';
+    const users = await programService.listFieldManagers({ availableOnly });
     return res.status(200).json(users);
   } catch (error) {
     return res.status(500).json({ message: 'Failed to load field managers.' });

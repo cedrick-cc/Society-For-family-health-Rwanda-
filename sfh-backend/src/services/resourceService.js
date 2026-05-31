@@ -262,13 +262,19 @@ async function recordUsage(programId, resourceId, quantityUsed, req) {
 async function listForFieldManager(userId) {
   const programs = await prisma.program.findMany({
     where: { fieldManagerId: userId },
-    select: { id: true },
+    select: { id: true, startDate: true, endDate: true },
   });
-  const ids = programs.map((p) => p.id);
+  const { computeProgramStatus } = require('../utils/programStatus');
+  const ids = programs
+    .filter((p) => {
+      const st = computeProgramStatus(p.startDate, p.endDate);
+      return st === 'PLANNED' || st === 'ONGOING';
+    })
+    .map((p) => p.id);
   if (!ids.length) return [];
   return prisma.programResource.findMany({
     where: { programId: { in: ids } },
-    include: { resource: true, program: { select: { id: true, title: true, programType: true } } },
+    include: { resource: true, program: { select: { id: true, title: true, programType: true, startDate: true, endDate: true } } },
   });
 }
 
