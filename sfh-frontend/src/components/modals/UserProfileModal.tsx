@@ -23,6 +23,7 @@ import { useAuth, roleLabels, roleColors, type UserRole } from '@/contexts/AuthC
 import { 
   User, 
   Mail,
+  Phone,
   Building2, 
   Edit,
   Save,
@@ -30,6 +31,7 @@ import {
   Key,
   Upload,
   Loader2,
+  IdCard,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -62,6 +64,8 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({ open, onOpenChange 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [volunteerProfile, setVolunteerProfile] = useState({
+    phone: '',
+    nationalId: '',
     skills: '',
     certifications: '',
     yearsOfExperience: 0,
@@ -93,6 +97,8 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({ open, onOpenChange 
       const r = String(profile.role || '').toUpperCase();
       if (r === 'VOLUNTEER') {
         setVolunteerProfile({
+          phone: profile.phone ? String(profile.phone) : '',
+          nationalId: profile.nationalId ? String(profile.nationalId) : '',
           skills: Array.isArray(profile.skills) ? profile.skills.join(', ') : '',
           certifications: Array.isArray(profile.certifications) ? profile.certifications.join(', ') : '',
           yearsOfExperience: Number(profile.yearsOfExperience) || 0,
@@ -132,6 +138,8 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({ open, onOpenChange 
         payload.volunteerDistrict = volunteerProfile.volunteerDistrict || null;
         payload.bio = volunteerProfile.bio || null;
         payload.volunteerOpsStatus = volunteerProfile.volunteerOpsStatus;
+        payload.phone = volunteerProfile.phone.trim() || null;
+        payload.nationalId = volunteerProfile.nationalId.trim() || null;
       }
 
       const response = await updateMyProfile(payload);
@@ -383,6 +391,33 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({ open, onOpenChange 
 
             {String(formData.role).toUpperCase() === 'VOLUNTEER' && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t">
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <Phone className="w-4 h-4 text-muted-foreground" />
+                    Phone number
+                  </Label>
+                  <Input
+                    value={volunteerProfile.phone}
+                    onChange={(e) => setVolunteerProfile((v) => ({ ...v, phone: e.target.value }))}
+                    disabled={!isEditing}
+                    placeholder="+250..."
+                    className={cn(!isEditing && 'bg-muted')}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <IdCard className="w-4 h-4 text-muted-foreground" />
+                    National ID
+                  </Label>
+                  <Input
+                    value={volunteerProfile.nationalId}
+                    onChange={(e) => setVolunteerProfile((v) => ({ ...v, nationalId: e.target.value }))}
+                    disabled={!isEditing}
+                    placeholder="16-digit ID"
+                    maxLength={16}
+                    className={cn(!isEditing && 'bg-muted')}
+                  />
+                </div>
                 <div className="space-y-2 sm:col-span-2">
                   <Label>About / bio</Label>
                   <Textarea

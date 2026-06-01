@@ -47,19 +47,17 @@ function wrapText(text, maxChars = 90) {
   return lines;
 }
 
-function computeImageDrawSize(imgRef, pageWidth, pageHeight, marginLeft, marginRight) {
+/** Scale image to fit page box (contain): full image visible, aspect ratio preserved, centered. */
+function computeImageDrawSize(imgRef, pageWidth, pageHeight, marginLeft, marginRight, marginTop, marginBottom) {
   const contentWidth = pageWidth - marginLeft - marginRight;
   const maxImgWidth = Math.floor(contentWidth * 0.875);
-  const srcW = imgRef.width || 400;
-  const srcH = imgRef.height || 300;
-  const aspect = srcH / srcW;
-  let imgW = maxImgWidth;
-  let imgH = Math.floor(imgW * aspect);
-  const maxImgHeight = Math.floor(pageHeight * 0.55);
-  if (imgH > maxImgHeight) {
-    imgH = maxImgHeight;
-    imgW = Math.floor(imgH / aspect);
-  }
+  const maxImgHeight = Math.floor((pageHeight - marginTop - marginBottom) * 0.72);
+
+  const srcW = Math.max(1, Number(imgRef.width) || 1);
+  const srcH = Math.max(1, Number(imgRef.height) || 1);
+  const scale = Math.min(maxImgWidth / srcW, maxImgHeight / srcH);
+  const imgW = Math.max(1, Math.floor(srcW * scale));
+  const imgH = Math.max(1, Math.floor(srcH * scale));
   const imgX = marginLeft + Math.floor((contentWidth - imgW) / 2);
   return { imgW, imgH, imgX, blockHeight: imgH + 20 };
 }
@@ -76,8 +74,9 @@ function assembleMultiPagePdf(pageStreams, imageObjects, pageWidth, pageHeight) 
   const imageIds = {};
   imageObjects.forEach((img, idx) => {
     const name = `Im${idx + 1}`;
+    const filter = img.filter || 'DCTDecode';
     imageIds[name] = addObject(
-      `<< /Type /XObject /Subtype /Image /Width ${img.width} /Height ${img.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${img.buffer.length} >>\nstream\n${img.buffer.toString('binary')}\nendstream`
+      `<< /Type /XObject /Subtype /Image /Width ${img.width} /Height ${img.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /${filter} /Length ${img.buffer.length} >>\nstream\n${img.buffer.toString('binary')}\nendstream`
     );
   });
 
@@ -185,7 +184,9 @@ function toFormattedPdf(title, sections, imageObjects = []) {
           pageWidth,
           pageHeight,
           marginLeft,
-          marginRight
+          marginRight,
+          marginTop,
+          marginBottom
         );
         ensureSpace(blockHeight);
         ops.push(`q ${imgW} 0 0 ${imgH} ${imgX} ${y - imgH} cm /${imgRef.name} Do Q`);
@@ -243,7 +244,13 @@ async function resolveFieldReportImages(evidenceUrls, startIndex = 0) {
     if (loaded && loaded.isJpeg) {
       imgIndex += 1;
       const name = `Im${imgIndex}`;
-      images.push({ name, buffer: loaded.buffer, width: 400, height: 300 });
+      images.push({
+        name,
+        buffer: loaded.buffer,
+        width: loaded.width,
+        height: loaded.height,
+        filter: loaded.filter,
+      });
       lines.push(`Evidence photo ${imgIndex - startIndex}: embedded below`);
     } else {
       lines.push('Image unavailable');

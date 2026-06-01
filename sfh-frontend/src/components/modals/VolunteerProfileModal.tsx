@@ -8,7 +8,7 @@ import {
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, MapPin, Mail, Phone, Award, ClipboardList, FileText, IdCard, Calendar } from 'lucide-react';
+import { Loader2, Award, ClipboardList, FileText, Calendar, User } from 'lucide-react';
 import { getVolunteerDetail } from '@/services/api';
 import UserAvatar from '@/components/UserAvatar';
 
@@ -141,24 +141,52 @@ const VolunteerProfileModal: React.FC<VolunteerProfileModalProps> = ({
                 </div>
               </div>
 
-              <div className="space-y-1.5 text-muted-foreground">
-                <p className="flex items-center gap-2"><Mail className="w-4 h-4 shrink-0" />{data.email}</p>
-                {phone && (
-                  <p className="flex items-center gap-2"><Phone className="w-4 h-4 shrink-0" />{phone}</p>
-                )}
-                {data.nationalId && (
-                  <p className="flex items-center gap-2"><IdCard className="w-4 h-4 shrink-0" />{data.nationalId}</p>
-                )}
-                <p className="flex items-center gap-2">
-                  <MapPin className="w-4 h-4 shrink-0" />
-                  {data.volunteerDistrict || '—'}
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase mb-2 flex items-center gap-1">
+                  <User className="w-3.5 h-3.5" /> Personal information
                 </p>
-                {registrationDate && (
-                  <p className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4 shrink-0" />
-                    Registered {new Date(registrationDate).toLocaleDateString()}
-                  </p>
-                )}
+                <dl className="space-y-2 text-sm">
+                  <div className="flex justify-between gap-4 border-b border-border/50 pb-2">
+                    <dt className="text-muted-foreground shrink-0">Full name</dt>
+                    <dd className="font-medium text-right">{data.name}</dd>
+                  </div>
+                  <div className="flex justify-between gap-4 border-b border-border/50 pb-2">
+                    <dt className="text-muted-foreground shrink-0">Email</dt>
+                    <dd className="font-medium text-right break-all">{data.email}</dd>
+                  </div>
+                  <div className="flex justify-between gap-4 border-b border-border/50 pb-2">
+                    <dt className="text-muted-foreground shrink-0">Phone number</dt>
+                    <dd className="font-medium text-right">{phone || '—'}</dd>
+                  </div>
+                  <div className="flex justify-between gap-4 border-b border-border/50 pb-2">
+                    <dt className="text-muted-foreground shrink-0">National ID</dt>
+                    <dd className="font-medium text-right">{data.nationalId || '—'}</dd>
+                  </div>
+                  <div className="flex justify-between gap-4 border-b border-border/50 pb-2">
+                    <dt className="text-muted-foreground shrink-0">District</dt>
+                    <dd className="font-medium text-right">{data.volunteerDistrict || '—'}</dd>
+                  </div>
+                  <div className="flex justify-between gap-4 border-b border-border/50 pb-2">
+                    <dt className="text-muted-foreground shrink-0">Status</dt>
+                    <dd className="font-medium text-right capitalize">{String(data.status).toLowerCase()}</dd>
+                  </div>
+                  <div className="flex justify-between gap-4 pb-1">
+                    <dt className="text-muted-foreground shrink-0">Experience</dt>
+                    <dd className="font-medium text-right">
+                      {(data.yearsOfExperience ?? 0) > 0
+                        ? `${data.yearsOfExperience} ${data.yearsOfExperience === 1 ? 'year' : 'years'}`
+                        : '—'}
+                    </dd>
+                  </div>
+                  {registrationDate && (
+                    <div className="flex justify-between gap-4 pt-1 text-xs text-muted-foreground">
+                      <dt className="flex items-center gap-1">
+                        <Calendar className="w-3.5 h-3.5" /> Registered
+                      </dt>
+                      <dd>{new Date(registrationDate).toLocaleDateString()}</dd>
+                    </div>
+                  )}
+                </dl>
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t">
@@ -184,15 +212,6 @@ const VolunteerProfileModal: React.FC<VolunteerProfileModalProps> = ({
                 <div>
                   <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Bio</p>
                   <p className="text-sm text-muted-foreground">{data.bio}</p>
-                </div>
-              )}
-
-              {(data.yearsOfExperience ?? 0) > 0 && (
-                <div>
-                  <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Experience</p>
-                  <p className="text-sm text-muted-foreground">
-                    {data.yearsOfExperience} {data.yearsOfExperience === 1 ? 'year' : 'years'}
-                  </p>
                 </div>
               )}
 

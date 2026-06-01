@@ -23,6 +23,8 @@ const profileSelect = {
   yearsOfExperience: true,
   volunteerDistrict: true,
   bio: true,
+  phone: true,
+  nationalId: true,
 };
 
 const getMyProfile = async (req, res) => {
@@ -56,6 +58,8 @@ const updateProfile = async (req, res) => {
       yearsOfExperience,
       volunteerDistrict,
       bio,
+      phone,
+      nationalId,
     } = req.body;
 
     const me = await prisma.user.findUnique({
@@ -94,6 +98,12 @@ const updateProfile = async (req, res) => {
       }
       if (bio !== undefined) {
         data.bio = bio ? String(bio).trim() : null;
+      }
+      if (phone !== undefined) {
+        data.phone = phone ? String(phone).trim() : null;
+      }
+      if (nationalId !== undefined) {
+        data.nationalId = nationalId ? String(nationalId).trim() : null;
       }
     }
 

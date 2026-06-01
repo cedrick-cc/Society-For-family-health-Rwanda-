@@ -57,6 +57,7 @@ interface Volunteer {
   name: string;
   email: string;
   phone: string;
+  nationalId?: string;
   avatar?: string;
   location: string;
   district: string;
