@@ -47,39 +47,123 @@ function wrapText(text, maxChars = 90) {
   return lines;
 }
 
+function computeImageDrawSize(imgRef, pageWidth, pageHeight, marginLeft, marginRight) {
+  const contentWidth = pageWidth - marginLeft - marginRight;
+  const maxImgWidth = Math.floor(contentWidth * 0.875);
+  const srcW = imgRef.width || 400;
+  const srcH = imgRef.height || 300;
+  const aspect = srcH / srcW;
+  let imgW = maxImgWidth;
+  let imgH = Math.floor(imgW * aspect);
+  const maxImgHeight = Math.floor(pageHeight * 0.55);
+  if (imgH > maxImgHeight) {
+    imgH = maxImgHeight;
+    imgW = Math.floor(imgH / aspect);
+  }
+  const imgX = marginLeft + Math.floor((contentWidth - imgW) / 2);
+  return { imgW, imgH, imgX, blockHeight: imgH + 20 };
+}
+
+function assembleMultiPagePdf(pageStreams, imageObjects, pageWidth, pageHeight) {
+  const objects = [];
+
+  const addObject = (body) => {
+    objects.push(body);
+    return objects.length;
+  };
+
+  const fontId = addObject('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');
+  const imageIds = {};
+  imageObjects.forEach((img, idx) => {
+    const name = `Im${idx + 1}`;
+    imageIds[name] = addObject(
+      `<< /Type /XObject /Subtype /Image /Width ${img.width} /Height ${img.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${img.buffer.length} >>\nstream\n${img.buffer.toString('binary')}\nendstream`
+    );
+  });
+
+  const xobjDict =
+    imageObjects.length > 0
+      ? `/XObject<< ${imageObjects.map((_, idx) => `/Im${idx + 1} ${imageIds[`Im${idx + 1}`]} 0 R`).join(' ')} >>`
+      : '';
+
+  const streamIds = pageStreams.map((streamBody) => {
+    const stream = `${streamBody}\n`;
+    return addObject(`<< /Length ${Buffer.byteLength(stream, 'utf8')} >>\nstream\n${stream}endstream`);
+  });
+
+  const pageIds = streamIds.map(
+    (streamId) =>
+      addObject(
+        `<< /Type /Page /Parent __PAGES__ /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Contents ${streamId} 0 R /Resources<< /Font<< /F1 ${fontId} 0 R >> ${xobjDict} >> >>`
+      )
+  );
+
+  const pagesId = addObject(
+    `<< /Type /Pages /Kids [${pageIds.map((id) => `${id} 0 R`).join(' ')}] /Count ${pageIds.length} >>`
+  );
+
+  pageIds.forEach((pageId) => {
+    objects[pageId - 1] = objects[pageId - 1].replace('__PAGES__', `${pagesId} 0 R`);
+  });
+
+  const catalogId = addObject(`<< /Type /Catalog /Pages ${pagesId} 0 R >>`);
+
+  const header = '%PDF-1.4\n';
+  const bodyParts = objects.map((body, i) => `${i + 1} 0 obj\n${body}\nendobj\n`);
+  let pdfBody = header + bodyParts.join('');
+  const xrefOffset = Buffer.byteLength(pdfBody, 'binary');
+  const pad = (n) => String(n).padStart(10, '0');
+  const offsets = [];
+  let pos = Buffer.byteLength(header, 'binary');
+  bodyParts.forEach((part) => {
+    offsets.push(pos);
+    pos += Buffer.byteLength(part, 'binary');
+  });
+  let xref = `xref\n0 ${objects.length + 1}\n${pad(0)} 65535 f \n`;
+  offsets.forEach((off) => {
+    xref += `${pad(off)} 00000 n \n`;
+  });
+  pdfBody += xref;
+  pdfBody += `trailer<< /Size ${objects.length + 1} /Root ${catalogId} 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
+  return Buffer.from(pdfBody, 'binary');
+}
+
 function toFormattedPdf(title, sections, imageObjects = []) {
   const pageHeight = 792;
   const pageWidth = 612;
   const marginLeft = 50;
+  const marginRight = 50;
+  const marginTop = 50;
+  const marginBottom = 50;
   const lineHeight = 14;
   const fontSize = 10;
   const titleSize = 16;
-  let y = pageHeight - 50;
-  let objectId = 6;
-  const xobjects = {};
-  const objectBodies = [];
 
-  imageObjects.forEach((img, idx) => {
-    const name = `Im${idx + 1}`;
-    const id = objectId++;
-    xobjects[name] = id;
-    objectBodies.push(
-      `${id} 0 obj<< /Type /XObject /Subtype /Image /Width ${img.width} /Height ${img.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${img.buffer.length} >>stream\n${img.buffer.toString('binary')}endstream\nendobj`
-    );
-  });
+  const pageStreams = [];
+  let ops = [];
+  let y = pageHeight - marginTop;
 
-  const ensureSpace = (needed) => {
-    if (y - needed < 50) y = 40;
+  const flushPage = () => {
+    if (ops.length > 0) pageStreams.push(ops.join('\n'));
+    ops = [];
+    y = pageHeight - marginTop;
   };
 
-  const contentOps = [];
-  contentOps.push(`BT /F1 ${titleSize} Tf ${marginLeft} ${y} Td (${pdfSafe(title)}) Tj ET`);
+  const ensureSpace = (needed) => {
+    if (y - needed < marginBottom) flushPage();
+  };
+
+  const addText = (size, x, text) => {
+    ops.push(`BT /F1 ${size} Tf ${x} ${y} Td (${pdfSafe(text)}) Tj ET`);
+  };
+
+  ops.push(`BT /F1 ${titleSize} Tf ${marginLeft} ${y} Td (${pdfSafe(title)}) Tj ET`);
   y -= 28;
 
   sections.forEach((section) => {
     if (section.heading) {
       ensureSpace(24);
-      contentOps.push(`BT /F1 12 Tf ${marginLeft} ${y} Td (${pdfSafe(section.heading)}) Tj ET`);
+      addText(12, marginLeft, section.heading);
       y -= 18;
     }
 
@@ -87,7 +171,7 @@ function toFormattedPdf(title, sections, imageObjects = []) {
       section.lines.forEach((line) => {
         wrapText(line, 88).forEach((wrapped) => {
           ensureSpace(lineHeight);
-          contentOps.push(`BT /F1 ${fontSize} Tf ${marginLeft} ${y} Td (${pdfSafe(wrapped)}) Tj ET`);
+          addText(fontSize, marginLeft, wrapped);
           y -= lineHeight;
         });
       });
@@ -96,21 +180,16 @@ function toFormattedPdf(title, sections, imageObjects = []) {
 
     if (section.images) {
       section.images.forEach((imgRef) => {
-        const contentWidth = pageWidth - marginLeft * 2;
-        const maxImgWidth = Math.floor(contentWidth * 0.875);
-        const srcW = imgRef.width || 400;
-        const srcH = imgRef.height || 300;
-        const aspect = srcH / srcW;
-        let imgW = maxImgWidth;
-        let imgH = Math.floor(imgW * aspect);
-        const maxImgHeight = Math.floor(pageHeight * 0.55);
-        if (imgH > maxImgHeight) {
-          imgH = maxImgHeight;
-          imgW = Math.floor(imgH / aspect);
-        }
-        ensureSpace(imgH + 24);
-        contentOps.push(`q ${imgW} 0 0 ${imgH} ${marginLeft} ${y - imgH} cm /${imgRef.name} Do Q`);
-        y -= imgH + 16;
+        const { imgW, imgH, imgX, blockHeight } = computeImageDrawSize(
+          imgRef,
+          pageWidth,
+          pageHeight,
+          marginLeft,
+          marginRight
+        );
+        ensureSpace(blockHeight);
+        ops.push(`q ${imgW} 0 0 ${imgH} ${imgX} ${y - imgH} cm /${imgRef.name} Do Q`);
+        y -= blockHeight;
       });
     }
 
@@ -120,7 +199,7 @@ function toFormattedPdf(title, sections, imageObjects = []) {
       ensureSpace(lineHeight * 2);
       let x = marginLeft;
       headers.forEach((h, i) => {
-        contentOps.push(`BT /F1 ${fontSize} Tf ${x} ${y} Td (${pdfSafe(h)}) Tj ET`);
+        ops.push(`BT /F1 ${fontSize} Tf ${x} ${y} Td (${pdfSafe(h)}) Tj ET`);
         x += widths[i];
       });
       y -= lineHeight + 2;
@@ -133,7 +212,7 @@ function toFormattedPdf(title, sections, imageObjects = []) {
           wrapText(String(cell ?? ''), maxLen).forEach((line, li) => {
             if (li > 0) y -= lineHeight;
             ensureSpace(lineHeight);
-            contentOps.push(`BT /F1 ${fontSize} Tf ${x} ${y} Td (${pdfSafe(line)}) Tj ET`);
+            ops.push(`BT /F1 ${fontSize} Tf ${x} ${y} Td (${pdfSafe(line)}) Tj ET`);
           });
           x += widths[i] || 100;
         });
@@ -143,42 +222,13 @@ function toFormattedPdf(title, sections, imageObjects = []) {
     }
   });
 
-  const streamBody = contentOps.join('\n');
-  const stream = `${streamBody}\n`;
-  const streamLen = Buffer.byteLength(stream, 'utf8');
+  flushPage();
+  if (pageStreams.length === 0) {
+    ops.push(`BT /F1 ${fontSize} Tf ${marginLeft} ${pageHeight - marginTop} Td (No content.) Tj ET`);
+    pageStreams.push(ops.join('\n'));
+  }
 
-  const xobjDict = Object.keys(xobjects).length
-    ? `/XObject<< ${Object.entries(xobjects).map(([k, v]) => `/${k} ${v} 0 R`).join(' ')} >>`
-    : '';
-
-  const pageObj = `3 0 obj<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Contents 4 0 R /Resources<< /Font<< /F1 5 0 R >> ${xobjDict} >> >>endobj`;
-
-  let pdf = `%PDF-1.4
-1 0 obj<< /Type /Catalog /Pages 2 0 R >>endobj
-2 0 obj<< /Type /Pages /Kids [3 0 R] /Count 1 >>endobj
-${pageObj}
-4 0 obj<< /Length ${streamLen} >>stream
-${stream}endstream
-endobj
-5 0 obj<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>endobj
-`;
-  objectBodies.forEach((body) => {
-    pdf += body + '\n';
-  });
-  pdf += `xref
-0 ${6 + objectBodies.length}
-0000000000 65535 f 
-0000000009 00000 n 
-0000000058 00000 n 
-0000000115 00000 n 
-0000000266 00000 n 
-0000000400 00000 n 
-trailer<< /Size ${6 + objectBodies.length} /Root 1 0 R >>
-startxref
-500
-%%EOF`;
-
-  return Buffer.from(pdf.replace(/\n/g, '\n'), 'binary');
+  return assembleMultiPagePdf(pageStreams, imageObjects, pageWidth, pageHeight);
 }
 
 async function resolveFieldReportImages(evidenceUrls, startIndex = 0) {
@@ -455,10 +505,15 @@ async function buildReportPdf(reportType, data, meta) {
               `Location: ${fr.location}`,
               `Beneficiaries reached: ${fr.beneficiariesCount}`,
               `Notes: ${(fr.notes || '').slice(0, 300)}`,
-              ...(imgLines.length ? imgLines : ['Evidence: none attached']),
+              ...(images.length === 0 ? ['Evidence: none attached'] : []),
             ],
-            images: images.map((img) => ({ name: img.name, width: img.width, height: img.height })),
           });
+          if (images.length > 0) {
+            sections.push({
+              lines: imgLines.length ? imgLines : ['Evidence photos:'],
+              images: images.map((img) => ({ name: img.name, width: img.width, height: img.height })),
+            });
+          }
         }
       }
       return toFormattedPdf('SFH OMS - Program Summary Report', sections, allImageObjects);

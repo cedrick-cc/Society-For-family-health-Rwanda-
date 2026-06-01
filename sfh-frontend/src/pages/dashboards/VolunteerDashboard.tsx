@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   HeartHandshake, MapPin, CheckCircle2, Clock, Calendar, Activity,
-  Award, Megaphone, User, ChevronRight, ClipboardList, Inbox, Play, Ban, Loader2,
+  Megaphone, User, ChevronRight, ClipboardList, Inbox, Play, Ban, Loader2,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -37,8 +37,6 @@ import { toast } from 'sonner';
 interface RecentBeneficiary {
   name: string; service: string; date: string; status: 'completed' | 'follow-up';
 }
-interface Badge { name: string; icon: string; earned: boolean; }
-
 const item = { hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } };
 const container = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.08 } } };
 
@@ -63,7 +61,6 @@ const VolunteerDashboard: React.FC = () => {
   const [myPrograms, setMyPrograms] = useState<Program[]>([]);
   const [fieldReports, setFieldReports] = useState<FieldReport[]>([]);
   const [recentBeneficiaries] = useState<RecentBeneficiary[]>([]);
-  const [badges] = useState<Badge[]>([]);
   const [taskBusyId, setTaskBusyId] = useState<string | null>(null);
   const [completeOpen, setCompleteOpen] = useState(false);
   const [completeId, setCompleteId] = useState<string | null>(null);
@@ -431,32 +428,8 @@ const VolunteerDashboard: React.FC = () => {
           <AnnouncementsCard compact />
         </motion.div>
 
-        {/* Achievements + Quick Actions */}
-        <motion.div variants={item} className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Card className="sfh-card">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base font-semibold flex items-center gap-2">
-                <Award className="w-4 h-4 text-warning" /> My Achievements
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {badges.length === 0 ? (
-                <EmptyState icon={Award} title="No achievements yet" description="Complete activities to unlock badges." compact />
-              ) : (
-                <div className="grid grid-cols-2 gap-3">
-                  {badges.map((b) => (
-                    <div key={b.name} className={cn('p-3 rounded-xl text-center border transition-all',
-                      b.earned ? 'bg-primary/5 border-primary/20 hover:border-primary/40' : 'bg-muted/30 border-dashed opacity-50')}>
-                      <div className="text-2xl mb-1">{b.icon}</div>
-                      <p className="text-xs font-medium leading-tight">{b.name}</p>
-                      {!b.earned && <p className="text-xs text-muted-foreground mt-0.5">Locked</p>}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
+        {/* Quick Actions */}
+        <motion.div variants={item}>
           <Card className="sfh-card">
             <CardHeader className="pb-3">
               <CardTitle className="text-base font-semibold">Quick Actions</CardTitle>

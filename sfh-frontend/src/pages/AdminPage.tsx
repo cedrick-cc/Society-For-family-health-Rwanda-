@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { fetchAuditLogs } from '@/lib/api';
-import { getUsers, getPendingUsers, approveUser, rejectUser, deactivateUser, activateUser, resetUserPassword, updateUser, getPermissions, updatePermissionValue } from '@/services/api';
+import { getUsers, getPendingUsers, approveUser, rejectUser, deactivateUser, activateUser, resetUserPassword, updateUser } from '@/services/api';
 import { EmptyState } from '@/components/ui/empty-state';
 import { motion } from 'framer-motion';
 import {
@@ -54,7 +54,6 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import AddUserModal from '@/components/modals/AddUserModal';
 import { toast } from 'sonner';
@@ -104,33 +103,6 @@ interface BackendUser {
   volunteerDistrict?: string | null;
 }
 
-interface PermissionRecord {
-  role: string;
-  module: string;
-  allowed: boolean;
-}
-
-const permissionModules = [
-  { key: 'DASHBOARD', label: 'Dashboard' },
-  { key: 'PROGRAMS', label: 'Programs' },
-  { key: 'VOLUNTEERS', label: 'Volunteers' },
-  { key: 'BENEFICIARIES', label: 'Beneficiaries' },
-  { key: 'GEOGRAPHIC', label: 'Geographic' },
-  { key: 'ANALYTICS', label: 'Analytics' },
-  { key: 'USER_MANAGEMENT', label: 'User Management' },
-  { key: 'SYSTEM_SETTINGS', label: 'System Settings' },
-  { key: 'AUDIT_LOGS', label: 'Audit Logs' },
-  { key: 'ANNOUNCEMENTS', label: 'Announcements' },
-];
-
-const permissionRoles = [
-  { key: 'ADMIN', label: 'Admin' },
-  { key: 'COORDINATOR', label: 'Coordinator' },
-  { key: 'FIELD_MANAGER', label: 'Field Manager' },
-  { key: 'ANALYST', label: 'Analyst' },
-  { key: 'VOLUNTEER', label: 'Volunteer' },
-];
-
 const roleTabConfig = [
   { key: 'administrators', role: 'admin', label: 'Administrators' },
   { key: 'coordinators', role: 'coordinator', label: 'Coordinators' },
@@ -164,7 +136,6 @@ const AdminPage: React.FC = () => {
   const [systemUsers, setSystemUsers] = useState<SystemUser[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState('users');
   const [roleUserTab, setRoleUserTab] = useState<RoleTabKey>('administrators');
   const [showAddUser, setShowAddUser] = useState(false);
   const [resetPasswordModal, setResetPasswordModal] = useState<{ open: boolean; email: string; password: string }>({ open: false, email: '', password: '' });
@@ -177,7 +148,6 @@ const AdminPage: React.FC = () => {
   const [editVolunteerOps, setEditVolunteerOps] = useState('AVAILABLE');
   const [editSkills, setEditSkills] = useState('');
   const [editVolunteerDistrict, setEditVolunteerDistrict] = useState('');
-  const [permissions, setPermissions] = useState<PermissionRecord[]>([]);
 
   const normalizeUser = (user: BackendUser): SystemUser => ({
     id: String(user.id),
@@ -215,18 +185,8 @@ const AdminPage: React.FC = () => {
     await Promise.all([loadUsers(), loadPendingUsers()]);
   };
 
-  const loadPermissions = async () => {
-    try {
-      const data = await getPermissions();
-      setPermissions(data || []);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to load permissions.');
-    }
-  };
-
   useEffect(() => {
     refreshUsersData();
-    loadPermissions();
     fetchAuditLogs().then((data) => setAuditLogs(data as AuditLog[]));
   }, []);
 
@@ -331,37 +291,6 @@ const AdminPage: React.FC = () => {
     }
   };
 
-  const getPermissionValue = (moduleName: string, role: string) => {
-    return permissions.some((permission) => permission.module === moduleName && permission.role === role && permission.allowed);
-  };
-
-  const handlePermissionToggle = async (moduleName: string, role: string, allowed: boolean) => {
-    setPermissions((prev) => {
-      const found = prev.find((permission) => permission.module === moduleName && permission.role === role);
-      if (!found) return [...prev, { module: moduleName, role, allowed }];
-
-      return prev.map((permission) =>
-        permission.module === moduleName && permission.role === role
-          ? { ...permission, allowed }
-          : permission
-      );
-    });
-
-    try {
-      await updatePermissionValue({ module: moduleName, role, allowed });
-      toast.success('Permission updated.');
-    } catch (error) {
-      setPermissions((prev) =>
-        prev.map((permission) =>
-          permission.module === moduleName && permission.role === role
-            ? { ...permission, allowed: !allowed }
-            : permission
-        )
-      );
-      toast.error(error instanceof Error ? error.message : 'Failed to update permission.');
-    }
-  };
-
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'active':
@@ -388,14 +317,21 @@ const AdminPage: React.FC = () => {
     }
   };
 
-  const activeRoleTab = roleTabConfig.find((t) => t.key === roleUserTab)!;
-  const filteredUsers = systemUsers.filter((user) => {
-    const matchesRole = user.role === activeRoleTab.role;
-    const matchesSearch =
-      user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesRole && matchesSearch;
-  });
+  const searchActive = searchQuery.trim().length > 0;
+  const searchLower = searchQuery.trim().toLowerCase();
+
+  const userMatchesSearch = (user: SystemUser) =>
+    user.name.toLowerCase().includes(searchLower) ||
+    user.email.toLowerCase().includes(searchLower) ||
+    user.role.toLowerCase().includes(searchLower) ||
+    formatRoleLabel(user.role).toLowerCase().includes(searchLower);
+
+  const globalSearchResults = searchActive ? systemUsers.filter(userMatchesSearch) : [];
+
+  const filteredUsersForTab = (tabRole: string) => {
+    if (searchActive) return globalSearchResults;
+    return systemUsers.filter((user) => user.role === tabRole);
+  };
 
   return (
     <motion.div
@@ -408,7 +344,7 @@ const AdminPage: React.FC = () => {
         <div>
           <h1 className="text-2xl font-display font-bold">System Administration</h1>
           <p className="text-muted-foreground mt-1">
-            Manage users, permissions, and system settings
+            Manage users and system settings
           </p>
         </div>
       </div>
@@ -461,20 +397,12 @@ const AdminPage: React.FC = () => {
         </Card>
       </div>
 
-      {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-2 max-w-sm">
-          <TabsTrigger value="users">Users</TabsTrigger>
-          <TabsTrigger value="permissions">Permissions</TabsTrigger>
-        </TabsList>
-
-        {/* Users Tab */}
-        <TabsContent value="users" className="mt-6 space-y-4">
+      <div className="space-y-4">
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
-                placeholder="Search users..."
+                placeholder="Search all users by name, email, or role..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
@@ -488,102 +416,188 @@ const AdminPage: React.FC = () => {
 
           <AddUserModal open={showAddUser} onOpenChange={setShowAddUser} onUserCreated={refreshUsersData} />
 
-          <Tabs value={roleUserTab} onValueChange={(v) => setRoleUserTab(v as RoleTabKey)} className="w-full">
-            <TabsList className="flex flex-wrap h-auto gap-1 w-full justify-start">
-              {roleTabConfig.map((tab) => (
-                <TabsTrigger key={tab.key} value={tab.key} className="text-xs sm:text-sm">
-                  {tab.label}
-                  <span className="ml-1.5 text-muted-foreground">
-                    ({systemUsers.filter((u) => u.role === tab.role).length})
-                  </span>
-                </TabsTrigger>
-              ))}
-            </TabsList>
-
-            {roleTabConfig.map((tab) => (
-              <TabsContent key={tab.key} value={tab.key} className="mt-4">
-                <Card className="sfh-card overflow-hidden">
-                  <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-muted/50">
-                        <TableHead className="font-semibold">User</TableHead>
-                        <TableHead className="font-semibold">Department</TableHead>
-                        <TableHead className="font-semibold">Status</TableHead>
-                        <TableHead className="font-semibold">Last Login</TableHead>
-                        <TableHead className="text-right font-semibold">Actions</TableHead>
+          {searchActive ? (
+            <Card className="sfh-card overflow-hidden">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">
+                  Search results ({globalSearchResults.length})
+                </CardTitle>
+              </CardHeader>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50">
+                      <TableHead className="font-semibold">User</TableHead>
+                      <TableHead className="font-semibold">Role</TableHead>
+                      <TableHead className="font-semibold">Department</TableHead>
+                      <TableHead className="font-semibold">Status</TableHead>
+                      <TableHead className="font-semibold">Last Login</TableHead>
+                      <TableHead className="text-right font-semibold">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {globalSearchResults.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                          No users match your search.
+                        </TableCell>
                       </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredUsers.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                            No {tab.label.toLowerCase()} found.
+                    ) : (
+                      globalSearchResults.map((user) => (
+                        <TableRow key={user.id} className="hover:bg-muted/30">
+                          <TableCell>
+                            <div className="flex items-center gap-3">
+                              <Avatar className="h-10 w-10">
+                                <AvatarFallback className="bg-primary/10 text-primary font-semibold text-sm">
+                                  {user.name.split(' ').map((n) => n[0]).join('').slice(0, 2)}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <p className="font-medium">{user.name}</p>
+                                <p className="text-xs text-muted-foreground">{user.email}</p>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="capitalize">{formatRoleLabel(user.role)}</Badge>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">{user.department}</TableCell>
+                          <TableCell>{getStatusBadge(user.status)}</TableCell>
+                          <TableCell className="text-muted-foreground text-sm">{formatLastLogin(user.lastLogin)}</TableCell>
+                          <TableCell className="text-right">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8">
+                                  <MoreVertical className="w-4 h-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => openEditModal(user)}>
+                                  <Edit className="w-4 h-4 mr-2" />
+                                  Edit User
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleResetPassword(user)}>
+                                  <Key className="w-4 h-4 mr-2" />
+                                  Reset Password
+                                </DropdownMenuItem>
+                                {user.status === 'inactive' ? (
+                                  <DropdownMenuItem onClick={() => handleActivate(user)}>
+                                    <CheckCircle2 className="w-4 h-4 mr-2" />
+                                    Activate
+                                  </DropdownMenuItem>
+                                ) : (
+                                  <DropdownMenuItem className="text-destructive" onClick={() => handleDeactivate(user)}>
+                                    <Trash2 className="w-4 h-4 mr-2" />
+                                    Deactivate
+                                  </DropdownMenuItem>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </TableCell>
                         </TableRow>
-                      ) : (
-                        filteredUsers.map((user) => (
-                          <TableRow key={user.id} className="hover:bg-muted/30">
-                            <TableCell>
-                              <div className="flex items-center gap-3">
-                                <Avatar className="h-10 w-10">
-                                  <AvatarFallback className="bg-primary/10 text-primary font-semibold text-sm">
-                                    {user.name
-                                      .split(' ')
-                                      .map((n) => n[0])
-                                      .join('')
-                                      .slice(0, 2)}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <div>
-                                  <p className="font-medium">{user.name}</p>
-                                  <p className="text-xs text-muted-foreground">{user.email}</p>
-                                </div>
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-muted-foreground">{user.department}</TableCell>
-                            <TableCell>{getStatusBadge(user.status)}</TableCell>
-                            <TableCell className="text-muted-foreground text-sm">{formatLastLogin(user.lastLogin)}</TableCell>
-                            <TableCell className="text-right">
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="icon" className="h-8 w-8">
-                                    <MoreVertical className="w-4 h-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem onClick={() => openEditModal(user)}>
-                                    <Edit className="w-4 h-4 mr-2" />
-                                    Edit User
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => handleResetPassword(user)}>
-                                    <Key className="w-4 h-4 mr-2" />
-                                    Reset Password
-                                  </DropdownMenuItem>
-                                  {user.status === 'inactive' ? (
-                                    <DropdownMenuItem onClick={() => handleActivate(user)}>
-                                      <CheckCircle2 className="w-4 h-4 mr-2" />
-                                      Activate
-                                    </DropdownMenuItem>
-                                  ) : (
-                                    <DropdownMenuItem className="text-destructive" onClick={() => handleDeactivate(user)}>
-                                      <Trash2 className="w-4 h-4 mr-2" />
-                                      Deactivate
-                                    </DropdownMenuItem>
-                                  )}
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
-                  </div>
-                </Card>
-              </TabsContent>
-            ))}
-          </Tabs>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </Card>
+          ) : (
+            <Tabs value={roleUserTab} onValueChange={(v) => setRoleUserTab(v as RoleTabKey)} className="w-full">
+              <TabsList className="flex flex-wrap h-auto gap-1 w-full justify-start">
+                {roleTabConfig.map((tab) => (
+                  <TabsTrigger key={tab.key} value={tab.key} className="text-xs sm:text-sm">
+                    {tab.label}
+                    <span className="ml-1.5 text-muted-foreground">
+                      ({systemUsers.filter((u) => u.role === tab.role).length})
+                    </span>
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+
+              {roleTabConfig.map((tab) => {
+                const tabUsers = filteredUsersForTab(tab.role);
+                return (
+                  <TabsContent key={tab.key} value={tab.key} className="mt-4">
+                    <Card className="sfh-card overflow-hidden">
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="bg-muted/50">
+                              <TableHead className="font-semibold">User</TableHead>
+                              <TableHead className="font-semibold">Department</TableHead>
+                              <TableHead className="font-semibold">Status</TableHead>
+                              <TableHead className="font-semibold">Last Login</TableHead>
+                              <TableHead className="text-right font-semibold">Actions</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {tabUsers.length === 0 ? (
+                              <TableRow>
+                                <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                                  No {tab.label.toLowerCase()} found.
+                                </TableCell>
+                              </TableRow>
+                            ) : (
+                              tabUsers.map((user) => (
+                                <TableRow key={user.id} className="hover:bg-muted/30">
+                                  <TableCell>
+                                    <div className="flex items-center gap-3">
+                                      <Avatar className="h-10 w-10">
+                                        <AvatarFallback className="bg-primary/10 text-primary font-semibold text-sm">
+                                          {user.name.split(' ').map((n) => n[0]).join('').slice(0, 2)}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                      <div>
+                                        <p className="font-medium">{user.name}</p>
+                                        <p className="text-xs text-muted-foreground">{user.email}</p>
+                                      </div>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="text-muted-foreground">{user.department}</TableCell>
+                                  <TableCell>{getStatusBadge(user.status)}</TableCell>
+                                  <TableCell className="text-muted-foreground text-sm">{formatLastLogin(user.lastLogin)}</TableCell>
+                                  <TableCell className="text-right">
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger asChild>
+                                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                                          <MoreVertical className="w-4 h-4" />
+                                        </Button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent align="end">
+                                        <DropdownMenuItem onClick={() => openEditModal(user)}>
+                                          <Edit className="w-4 h-4 mr-2" />
+                                          Edit User
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => handleResetPassword(user)}>
+                                          <Key className="w-4 h-4 mr-2" />
+                                          Reset Password
+                                        </DropdownMenuItem>
+                                        {user.status === 'inactive' ? (
+                                          <DropdownMenuItem onClick={() => handleActivate(user)}>
+                                            <CheckCircle2 className="w-4 h-4 mr-2" />
+                                            Activate
+                                          </DropdownMenuItem>
+                                        ) : (
+                                          <DropdownMenuItem className="text-destructive" onClick={() => handleDeactivate(user)}>
+                                            <Trash2 className="w-4 h-4 mr-2" />
+                                            Deactivate
+                                          </DropdownMenuItem>
+                                        )}
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
+                                  </TableCell>
+                                </TableRow>
+                              ))
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </Card>
+                  </TabsContent>
+                );
+              })}
+            </Tabs>
+          )}
 
           <Card className="sfh-card">
             <CardHeader>
@@ -618,49 +632,7 @@ const AdminPage: React.FC = () => {
               )}
             </CardContent>
           </Card>
-        </TabsContent>
-
-        {/* Permissions Tab */}
-        <TabsContent value="permissions" className="mt-6">
-          <Card className="sfh-card overflow-hidden">
-            <CardHeader>
-              <CardTitle className="text-lg font-semibold">Role-Based Access Matrix</CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/50">
-                    <TableHead className="font-semibold">Module</TableHead>
-                    <TableHead className="text-center font-semibold">Admin</TableHead>
-                    <TableHead className="text-center font-semibold">Coordinator</TableHead>
-                    <TableHead className="text-center font-semibold">Field Manager</TableHead>
-                    <TableHead className="text-center font-semibold">Analyst</TableHead>
-                    <TableHead className="text-center font-semibold">Volunteer</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {permissionModules.map((moduleItem) => (
-                    <TableRow key={moduleItem.key}>
-                      <TableCell className="font-medium">{moduleItem.label}</TableCell>
-                      {permissionRoles.map((roleItem) => (
-                        <TableCell key={`${moduleItem.key}-${roleItem.key}`} className="text-center">
-                          <div className="flex justify-center">
-                            <Switch
-                              checked={getPermissionValue(moduleItem.key, roleItem.key)}
-                              onCheckedChange={(checked) => handlePermissionToggle(moduleItem.key, roleItem.key, checked)}
-                            />
-                          </div>
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-      </Tabs>
+      </div>
 
       {/* Reset Password Modal */}
       <Dialog open={resetPasswordModal.open} onOpenChange={(open) => setResetPasswordModal((prev) => ({ ...prev, open }))}>

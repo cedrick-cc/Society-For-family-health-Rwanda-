@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   BarChart3, PieChart, Download, ArrowUpRight, ArrowDownRight,
-  Filter, Database, MapPin, Users, HeartHandshake, Target,
+  Filter, MapPin, Users, HeartHandshake, Target,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,28 +16,48 @@ import { EmptyChartOverlay } from '@/components/ui/empty-state';
 import GenerateReportModal from '@/components/modals/GenerateReportModal';
 import AnnouncementsCard from '@/components/AnnouncementsCard';
 import { fetchAnalytics, type AnalyticsSummary, emptyAnalytics } from '@/lib/api';
+import { PROGRAM_TYPE_LABELS, type ProgramTypeKey } from '@/lib/programResources';
 
 const item = { hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } };
 const container = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.08 } } };
 
-interface DataQuality { label: string; value: number; status: 'good' | 'warning' }
+const CHART_COLORS = [
+  'hsl(222,72%,42%)',
+  'hsl(120,70%,45%)',
+  'hsl(24,95%,55%)',
+  'hsl(200,80%,50%)',
+  'hsl(280,65%,50%)',
+];
+
+function programTypeLabel(raw: string) {
+  const key = raw.toUpperCase().replace(/\s+/g, '_') as ProgramTypeKey;
+  return PROGRAM_TYPE_LABELS[key] || raw.replace(/_/g, ' ');
+}
 
 const AnalystDashboard: React.FC = () => {
   const { user } = useAuth();
   const [showReport, setShowReport] = useState(false);
   const [analytics, setAnalytics] = useState<AnalyticsSummary>(emptyAnalytics);
-  const [dataQuality] = useState<DataQuality[]>([]);
 
   useEffect(() => {
     fetchAnalytics().then(setAnalytics);
   }, []);
 
   const monthlyTrend = analytics.monthlyTrend;
-  const districtData: Array<{ district: string; reached: number; target: number }> = [];
-  const serviceBreakdown = analytics.programTypes.map((p, i) => ({
-    name: p.type,
-    value: p.beneficiaries,
-    color: ['hsl(222,72%,42%)', 'hsl(120,70%,45%)', 'hsl(24,95%,55%)', 'hsl(200,80%,50%)'][i % 4],
+  const serviceBreakdown = analytics.programTypes
+    .filter((p) => p.count > 0)
+    .map((p, i) => ({
+      name: programTypeLabel(p.type),
+      value: p.count,
+      color: CHART_COLORS[i % CHART_COLORS.length],
+    }));
+
+  const districtOps = (analytics.districtCoverage || []).slice(0, 10).map((d) => ({
+    district: d.district.length > 12 ? `${d.district.slice(0, 11)}…` : d.district,
+    fullDistrict: d.district,
+    programs: d.programs,
+    reports: d.reports,
+    beneficiaries: d.beneficiaries,
   }));
 
   const kpis = [
@@ -59,7 +79,7 @@ const AnalystDashboard: React.FC = () => {
             </div>
             <h1 className="text-2xl font-display font-bold text-foreground">Analytics Intelligence Center</h1>
             <p className="text-muted-foreground mt-1">
-              {user?.name?.split(' ')[0] || 'User'}, awaiting backend data sync.
+              Welcome back, {user?.name?.split(' ')[0] || 'Analyst'} — live data from programs, reports, and beneficiaries.
             </p>
           </div>
           <div className="flex gap-2">
@@ -127,30 +147,32 @@ const AnalystDashboard: React.FC = () => {
               <CardTitle className="text-base font-semibold flex items-center gap-2">
                 <PieChart className="w-4 h-4 text-accent" /> Service Distribution
               </CardTitle>
+              <p className="text-xs text-muted-foreground font-normal">Programs by type (from database)</p>
             </CardHeader>
             <CardContent>
               <div className="relative">
                 <ResponsiveContainer width="100%" height={180}>
                   <RPieChart>
-                    <Pie data={serviceBreakdown} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={3} dataKey="value">
+                    <Pie data={serviceBreakdown} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={3} dataKey="value" nameKey="name">
                       {serviceBreakdown.map((e, i) => <Cell key={i} fill={e.color} />)}
                     </Pie>
                     <Tooltip contentStyle={{ borderRadius: '12px', border: '1px solid hsl(var(--border))' }} />
+                    <Legend wrapperStyle={{ fontSize: '11px' }} />
                   </RPieChart>
                 </ResponsiveContainer>
                 {serviceBreakdown.length === 0 && <EmptyChartOverlay />}
               </div>
               <div className="space-y-1.5 mt-2">
                 {serviceBreakdown.length === 0 ? (
-                  <p className="text-xs text-muted-foreground text-center py-2">No service categories yet.</p>
+                  <p className="text-xs text-muted-foreground text-center py-2">No programs in the system yet.</p>
                 ) : (
                   serviceBreakdown.map((s) => (
                     <div key={s.name} className="flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-2">
-                        <div className="w-2.5 h-2.5 rounded-full" style={{ background: s.color }} />
-                        <span className="text-muted-foreground">{s.name}</span>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: s.color }} />
+                        <span className="text-muted-foreground truncate">{s.name}</span>
                       </div>
-                      <span className="font-semibold">{s.value}</span>
+                      <span className="font-semibold shrink-0 ml-2">{s.value} programs</span>
                     </div>
                   ))
                 )}
@@ -159,57 +181,35 @@ const AnalystDashboard: React.FC = () => {
           </Card>
         </motion.div>
 
-        <motion.div variants={item} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card className="sfh-card">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base font-semibold">District Coverage vs Target</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="relative">
-                <ResponsiveContainer width="100%" height={200}>
-                  <BarChart data={districtData} barGap={4}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis dataKey="district" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
-                    <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
-                    <Tooltip contentStyle={{ borderRadius: '12px', border: '1px solid hsl(var(--border))' }} />
-                    <Legend />
-                    <Bar dataKey="target" fill="hsl(222,72%,42%)" opacity={0.3} radius={[4, 4, 0, 0]} name="Target" />
-                    <Bar dataKey="reached" fill="hsl(120,70%,45%)" radius={[4, 4, 0, 0]} name="Reached" />
-                  </BarChart>
-                </ResponsiveContainer>
-                {districtData.length === 0 && <EmptyChartOverlay />}
-              </div>
-            </CardContent>
-          </Card>
-
+        <motion.div variants={item}>
           <Card className="sfh-card">
             <CardHeader className="pb-3">
               <CardTitle className="text-base font-semibold flex items-center gap-2">
-                <Database className="w-4 h-4 text-primary" /> Data Quality Metrics
+                <MapPin className="w-4 h-4 text-info" /> District Operations Coverage
               </CardTitle>
+              <p className="text-xs text-muted-foreground font-normal">
+                Programs, field reports, and beneficiaries registered per district
+              </p>
             </CardHeader>
-            <CardContent className="space-y-4">
-              {dataQuality.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-6">No data quality metrics available yet.</p>
-              ) : (
-                dataQuality.map((d) => (
-                  <div key={d.label}>
-                    <div className="flex items-center justify-between text-sm mb-1.5">
-                      <span className="font-medium">{d.label}</span>
-                      <span className={cn('font-bold', d.status === 'good' ? 'text-success' : 'text-warning')}>{d.value}%</span>
-                    </div>
-                    <div className="w-full bg-muted rounded-full h-2">
-                      <div
-                        className={cn('h-2 rounded-full transition-all', d.status === 'good' ? 'bg-success' : 'bg-warning')}
-                        style={{ width: `${d.value}%` }}
-                      />
-                    </div>
-                  </div>
-                ))
-              )}
-              <Button className="w-full mt-2" size="sm" onClick={() => setShowReport(true)}>
-                <Download className="w-4 h-4" /> Generate Full Report
-              </Button>
+            <CardContent>
+              <div className="relative">
+                <ResponsiveContainer width="100%" height={280}>
+                  <BarChart data={districtOps} barGap={4} margin={{ bottom: 8 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="district" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" interval={0} angle={-25} textAnchor="end" height={56} />
+                    <YAxis tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" allowDecimals={false} />
+                    <Tooltip
+                      contentStyle={{ borderRadius: '12px', border: '1px solid hsl(var(--border))' }}
+                      labelFormatter={(_, payload) => payload?.[0]?.payload?.fullDistrict || ''}
+                    />
+                    <Legend />
+                    <Bar dataKey="programs" fill="hsl(222,72%,42%)" radius={[4, 4, 0, 0]} name="Programs" />
+                    <Bar dataKey="reports" fill="hsl(24,95%,55%)" radius={[4, 4, 0, 0]} name="Field reports" />
+                    <Bar dataKey="beneficiaries" fill="hsl(120,70%,45%)" radius={[4, 4, 0, 0]} name="Beneficiaries" />
+                  </BarChart>
+                </ResponsiveContainer>
+                {districtOps.length === 0 && <EmptyChartOverlay />}
+              </div>
             </CardContent>
           </Card>
         </motion.div>

@@ -2,12 +2,12 @@ import React, { useEffect, useState } from 'react';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2, MapPin, Mail, Phone, Award, ClipboardList, FileText, IdCard, Calendar } from 'lucide-react';
 import { getVolunteerDetail } from '@/services/api';
 import UserAvatar from '@/components/UserAvatar';
@@ -104,27 +104,30 @@ const VolunteerProfileModal: React.FC<VolunteerProfileModalProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-w-[95vw] max-h-[90vh] flex flex-col p-0 gap-0">
-        <DialogHeader className="px-6 pt-6 pb-2 shrink-0">
-          <DialogTitle className="text-lg font-display pr-8">
+      <DialogContent className="max-w-md w-[95vw] max-h-[85vh] flex flex-col p-0 gap-0 overflow-hidden">
+        <DialogHeader className="px-5 pt-5 pb-2 shrink-0">
+          <DialogTitle className="text-base font-display pr-8">
             {loading ? 'Volunteer profile' : data?.name || 'Volunteer'}
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            Volunteer profile details including contact information, programs, tasks, and field reports.
+          </DialogDescription>
         </DialogHeader>
 
         {loading && (
-          <div className="flex justify-center py-12">
+          <div className="flex justify-center py-10 shrink-0">
             <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
           </div>
         )}
 
         {!loading && data && (
-          <ScrollArea className="flex-1 min-h-0 max-h-[calc(90vh-7rem)] px-6">
-            <div className="space-y-4 text-sm pb-6">
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-5">
+            <div className="space-y-4 text-sm pb-5">
               <div className="flex items-center gap-4">
                 {avatarUser && (
                   <UserAvatar
                     user={avatarUser}
-                    sizeClass="h-16 w-16"
+                    sizeClass="h-14 w-14"
                     className="ring-2 ring-primary/20"
                   />
                 )}
@@ -139,26 +142,26 @@ const VolunteerProfileModal: React.FC<VolunteerProfileModalProps> = ({
               </div>
 
               <div className="space-y-1.5 text-muted-foreground">
-                <p className="flex items-center gap-2"><Mail className="w-4 h-4" />{data.email}</p>
+                <p className="flex items-center gap-2"><Mail className="w-4 h-4 shrink-0" />{data.email}</p>
                 {phone && (
-                  <p className="flex items-center gap-2"><Phone className="w-4 h-4" />{phone}</p>
+                  <p className="flex items-center gap-2"><Phone className="w-4 h-4 shrink-0" />{phone}</p>
                 )}
                 {data.nationalId && (
-                  <p className="flex items-center gap-2"><IdCard className="w-4 h-4" />{data.nationalId}</p>
+                  <p className="flex items-center gap-2"><IdCard className="w-4 h-4 shrink-0" />{data.nationalId}</p>
                 )}
                 <p className="flex items-center gap-2">
-                  <MapPin className="w-4 h-4" />
+                  <MapPin className="w-4 h-4 shrink-0" />
                   {data.volunteerDistrict || '—'}
                 </p>
                 {registrationDate && (
                   <p className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4" />
+                    <Calendar className="w-4 h-4 shrink-0" />
                     Registered {new Date(registrationDate).toLocaleDateString()}
                   </p>
                 )}
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 border-t">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t">
                 <div className="text-center p-2 rounded-lg bg-muted/50">
                   <p className="text-lg font-semibold">{programsAssigned}</p>
                   <p className="text-xs text-muted-foreground">Assigned</p>
@@ -283,11 +286,11 @@ const VolunteerProfileModal: React.FC<VolunteerProfileModalProps> = ({
                 </div>
               )}
             </div>
-          </ScrollArea>
+          </div>
         )}
 
-        <div className="px-6 py-4 border-t shrink-0 flex justify-end">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
+        <div className="px-5 py-3 border-t shrink-0 flex justify-end bg-background">
+          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>Close</Button>
         </div>
       </DialogContent>
     </Dialog>

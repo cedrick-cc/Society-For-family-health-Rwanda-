@@ -59,7 +59,7 @@ const mainNavItems: NavItem[] = [
     title: 'Geographic Tracking',
     icon: MapPin,
     path: '/dashboard/geographic',
-    roles: ['admin', 'coordinator', 'field_manager', 'analyst'],
+    roles: ['admin', 'coordinator', 'field_manager', 'analyst', 'volunteer'],
     badge: 'Map',
   },
   {

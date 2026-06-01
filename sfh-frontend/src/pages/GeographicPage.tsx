@@ -39,7 +39,8 @@ import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
 import ProgramDetailsModal from '@/components/modals/ProgramDetailsModal';
 import { toast } from '@/hooks/use-toast';
-import { getPrograms } from '@/services/api';
+import { getPrograms, getProgramsAsVolunteer } from '@/services/api';
+import { useAuth } from '@/contexts/AuthContext';
 import { mapApiProgramToUI } from '@/lib/entityMappers';
 import type { Program } from '@/lib/api';
 import type { ApiProgram } from '@/lib/entityMappers';
@@ -137,6 +138,7 @@ const MAP_DEFAULTS = {
 };
 
 const GeographicPage: React.FC = () => {
+  const { user } = useAuth();
   const [outreachLocations, setOutreachLocations] = useState<OutreachLocation[]>([]);
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedLocation, setSelectedLocation] = useState<OutreachLocation | null>(null);
@@ -153,7 +155,8 @@ const GeographicPage: React.FC = () => {
     let cancelled = false;
     (async () => {
       try {
-        const raw = await getPrograms();
+        const raw =
+          user?.role === 'volunteer' ? await getProgramsAsVolunteer() : await getPrograms();
         if (cancelled) return;
         const list = Array.isArray(raw) ? raw : [];
         const mapped = list
@@ -167,7 +170,7 @@ const GeographicPage: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [user?.role]);
 
   // Create icons inside component to ensure proper initialization
   const statusIcons = useMemo(() => ({
