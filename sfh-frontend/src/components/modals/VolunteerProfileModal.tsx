@@ -33,6 +33,7 @@ export type VolunteerProfileData = {
   registrationDate?: string;
   joinDate?: string;
   bio?: string | null;
+  yearsOfExperience?: number;
   assignedPrograms?: Array<{ id: string; title: string; status: string; district: string }>;
   completedTasks?: Array<{ id: string; title: string }>;
   fieldReports?: Array<{
@@ -180,6 +181,15 @@ const VolunteerProfileModal: React.FC<VolunteerProfileModalProps> = ({
                 <div>
                   <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Bio</p>
                   <p className="text-sm text-muted-foreground">{data.bio}</p>
+                </div>
+              )}
+
+              {(data.yearsOfExperience ?? 0) > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Experience</p>
+                  <p className="text-sm text-muted-foreground">
+                    {data.yearsOfExperience} {data.yearsOfExperience === 1 ? 'year' : 'years'}
+                  </p>
                 </div>
               )}
 

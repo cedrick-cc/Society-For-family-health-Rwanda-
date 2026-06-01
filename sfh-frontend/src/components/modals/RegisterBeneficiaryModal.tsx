@@ -279,15 +279,15 @@ const RegisterBeneficiaryModal: React.FC<RegisterBeneficiaryModalProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-w-[95vw] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-xl w-[95vw] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-xl font-display">
+          <DialogTitle className="flex items-center gap-2 text-lg font-display">
             <HeartHandshake className="w-5 h-5 text-secondary" />
             {beneficiaryToEdit ? 'Edit Beneficiary' : 'Register Beneficiary'}
           </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6 mt-4">
+        <form onSubmit={handleSubmit} className="space-y-4 mt-2">
           <div className="space-y-4">
             <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide flex items-center gap-2">
               <User className="w-4 h-4" />

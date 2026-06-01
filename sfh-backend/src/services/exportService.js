@@ -96,11 +96,21 @@ function toFormattedPdf(title, sections, imageObjects = []) {
 
     if (section.images) {
       section.images.forEach((imgRef) => {
-        const imgW = 120;
-        const imgH = 90;
-        ensureSpace(imgH + 20);
+        const contentWidth = pageWidth - marginLeft * 2;
+        const maxImgWidth = Math.floor(contentWidth * 0.875);
+        const srcW = imgRef.width || 400;
+        const srcH = imgRef.height || 300;
+        const aspect = srcH / srcW;
+        let imgW = maxImgWidth;
+        let imgH = Math.floor(imgW * aspect);
+        const maxImgHeight = Math.floor(pageHeight * 0.55);
+        if (imgH > maxImgHeight) {
+          imgH = maxImgHeight;
+          imgW = Math.floor(imgH / aspect);
+        }
+        ensureSpace(imgH + 24);
         contentOps.push(`q ${imgW} 0 0 ${imgH} ${marginLeft} ${y - imgH} cm /${imgRef.name} Do Q`);
-        y -= imgH + 14;
+        y -= imgH + 16;
       });
     }
 
@@ -447,7 +457,7 @@ async function buildReportPdf(reportType, data, meta) {
               `Notes: ${(fr.notes || '').slice(0, 300)}`,
               ...(imgLines.length ? imgLines : ['Evidence: none attached']),
             ],
-            images: images.map((img) => ({ name: img.name })),
+            images: images.map((img) => ({ name: img.name, width: img.width, height: img.height })),
           });
         }
       }

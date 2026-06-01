@@ -2,13 +2,13 @@ import React, { useEffect, useState } from 'react';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   MapPin,
   Calendar,
@@ -137,11 +137,14 @@ const ProgramDetailsModal: React.FC<ProgramDetailsModalProps> = ({ open, onOpenC
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-w-[95vw] max-h-[90vh] overflow-y-auto flex flex-col">
-        <DialogHeader>
+      <DialogContent className="max-w-lg w-[95vw] max-h-[90vh] flex flex-col p-0 gap-0 overflow-hidden">
+        <DialogHeader className="px-6 pt-6 pb-2 shrink-0">
           <DialogTitle className="text-lg font-display pr-8">
             {loading ? 'Program details' : p?.title || 'Program'}
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            Full program details including location, progress, volunteers, resources, tasks, and field reports.
+          </DialogDescription>
         </DialogHeader>
 
         {loading && (
@@ -151,7 +154,7 @@ const ProgramDetailsModal: React.FC<ProgramDetailsModalProps> = ({ open, onOpenC
         )}
 
         {!loading && p && (
-          <ScrollArea className="flex-1 max-h-[calc(90vh-8rem)] pr-3">
+          <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-4">
             <div className="space-y-4 text-sm">
               <div className="flex flex-wrap gap-2">
                 <Badge
@@ -290,14 +293,14 @@ const ProgramDetailsModal: React.FC<ProgramDetailsModalProps> = ({ open, onOpenC
                 )}
               </div>
             </div>
-          </ScrollArea>
+          </div>
         )}
 
         {!loading && !p && programId && (
-          <p className="text-sm text-muted-foreground py-6 text-center">Could not load program.</p>
+          <p className="text-sm text-muted-foreground py-6 text-center px-6">Could not load program.</p>
         )}
 
-        <div className="flex justify-end pt-2 border-t">
+        <div className="px-6 py-4 border-t shrink-0 flex justify-end">
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             Close
           </Button>

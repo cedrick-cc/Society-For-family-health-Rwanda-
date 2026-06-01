@@ -9,7 +9,6 @@ import {
   MapPin,
   Filter,
   Layers,
-  Navigation,
   Users,
   HeartHandshake,
   Calendar,
@@ -38,7 +37,6 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
-import AddLocationModal from '@/components/modals/AddLocationModal';
 import ProgramDetailsModal from '@/components/modals/ProgramDetailsModal';
 import { toast } from '@/hooks/use-toast';
 import { getPrograms } from '@/services/api';
@@ -143,7 +141,6 @@ const GeographicPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedLocation, setSelectedLocation] = useState<OutreachLocation | null>(null);
   const [showCoverage, setShowCoverage] = useState(true);
-  const [showAddLocation, setShowAddLocation] = useState(false);
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const clusterGroupRef = useRef<L.MarkerClusterGroup | null>(null);
@@ -352,31 +349,8 @@ const GeographicPage: React.FC = () => {
             Monitor outreach activities across Rwanda in real-time
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button 
-            variant="outline" 
-            className="gap-2"
-            onClick={() => {
-              if (mapRef.current) {
-                mapRef.current.locate({ setView: true, maxZoom: 12 });
-                toast({
-                  title: "Locating...",
-                  description: "Finding your current location on the map.",
-                });
-              }
-            }}
-          >
-            <Navigation className="w-4 h-4" />
-            My Location
-          </Button>
-          <Button className="gap-2" onClick={() => setShowAddLocation(true)}>
-            <MapPin className="w-4 h-4" />
-            Add Location
-          </Button>
-        </div>
       </div>
 
-      <AddLocationModal open={showAddLocation} onOpenChange={setShowAddLocation} />
       <ProgramDetailsModal
         open={detailsOpen}
         onOpenChange={(o) => {

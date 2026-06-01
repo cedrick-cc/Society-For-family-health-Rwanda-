@@ -34,7 +34,6 @@ import CalendarModal from '@/components/modals/CalendarModal';
 import CreateProgramModal from '@/components/modals/CreateProgramModal';
 import AddVolunteerModal from '@/components/modals/AddVolunteerModal';
 import RegisterBeneficiaryModal from '@/components/modals/RegisterBeneficiaryModal';
-import AddLocationModal from '@/components/modals/AddLocationModal';
 import ScheduleActivityModal from '@/components/modals/ScheduleActivityModal';
 import GenerateReportModal from '@/components/modals/GenerateReportModal';
 import ActivityFeed from '@/components/ActivityFeed';
@@ -47,7 +46,6 @@ const DashboardHome: React.FC = () => {
   const [showCreateProgram, setShowCreateProgram] = useState(false);
   const [showAddVolunteer, setShowAddVolunteer] = useState(false);
   const [showRegisterBeneficiary, setShowRegisterBeneficiary] = useState(false);
-  const [showAddLocation, setShowAddLocation] = useState(false);
   const [showScheduleActivity, setShowScheduleActivity] = useState(false);
   const [showGenerateReport, setShowGenerateReport] = useState(false);
 
@@ -414,17 +412,6 @@ const DashboardHome: React.FC = () => {
                   <span className="text-sm">Generate Report</span>
                 </Button>
               </div>
-              {/* Admin-only: Add Location */}
-              {user?.role === 'admin' && (
-                <Button 
-                  variant="outline" 
-                  className="w-full mt-3 gap-2"
-                  onClick={() => setShowAddLocation(true)}
-                >
-                  <MapPin className="w-4 h-4 text-accent" />
-                  Add Location
-                </Button>
-              )}
             </CardContent>
           </Card>
 
@@ -458,7 +445,6 @@ const DashboardHome: React.FC = () => {
         onOpenChange={setShowRegisterBeneficiary}
         onSaved={reloadDashboardData}
       />
-      <AddLocationModal open={showAddLocation} onOpenChange={setShowAddLocation} />
       <ScheduleActivityModal open={showScheduleActivity} onOpenChange={setShowScheduleActivity} />
       <GenerateReportModal open={showGenerateReport} onOpenChange={setShowGenerateReport} />
     </>

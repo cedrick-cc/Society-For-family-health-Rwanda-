@@ -130,6 +130,7 @@ async function getVolunteerDetail(volunteerId) {
       volunteerOpsStatus: true,
       volunteerDistrict: true,
       bio: true,
+      yearsOfExperience: true,
       createdAt: true,
       programVolunteers: {
         include: {
@@ -163,7 +164,7 @@ async function getVolunteerDetail(volunteerId) {
         take: 15,
       },
       activityLogs: {
-        select: { action: true, description: true, createdAt: true },
+        select: { actionType: true, description: true, createdAt: true },
         orderBy: { createdAt: 'desc' },
         take: 10,
       },
@@ -182,7 +183,8 @@ async function getVolunteerDetail(volunteerId) {
   return {
     ...summary,
     bio: v.bio,
-    assignedPrograms: (v.programVolunteers || []).map((pv) => ({
+    yearsOfExperience: v.yearsOfExperience ?? 0,
+    assignedPrograms: (v.programVolunteers || []).filter((pv) => pv.program).map((pv) => ({
       id: pv.program.id,
       title: pv.program.title,
       status: pv.program.status,
@@ -205,7 +207,7 @@ async function getVolunteerDetail(volunteerId) {
     })),
     beneficiariesRegistered: v.beneficiariesCreated,
     recentActivities: (v.activityLogs || []).map((a) => ({
-      action: a.action,
+      action: a.actionType,
       description: a.description,
       at: a.createdAt,
     })),

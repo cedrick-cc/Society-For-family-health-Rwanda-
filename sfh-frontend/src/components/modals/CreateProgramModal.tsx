@@ -337,10 +337,10 @@ const CreateProgramModal: React.FC<CreateProgramModalProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-w-[95vw] max-h-[85vh] flex flex-col overflow-hidden p-0">
-        <div className="px-6 pt-6 pb-0">
+      <DialogContent className="max-w-xl w-[95vw] max-h-[85vh] flex flex-col overflow-hidden p-0">
+        <div className="px-5 pt-5 pb-0">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-xl font-display">
+            <DialogTitle className="flex items-center gap-2 text-lg font-display">
               <Target className="w-5 h-5 text-primary" />
               {programToEdit ? 'Edit Program' : 'Create New Program'}
             </DialogTitle>
@@ -383,7 +383,7 @@ const CreateProgramModal: React.FC<CreateProgramModalProps> = ({
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-6 py-4 min-h-0">
+        <div className="flex-1 overflow-y-auto px-5 py-3 min-h-0">
           {currentStep === 1 && (
             <div className="space-y-4">
               <div className="space-y-2">
@@ -445,7 +445,13 @@ const CreateProgramModal: React.FC<CreateProgramModalProps> = ({
                         {formData.startDate ? format(formData.startDate, 'PPP') : 'Select date'}
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start" side="bottom">
+                    <PopoverContent
+                      className="w-auto p-0"
+                      align="center"
+                      side="bottom"
+                      sideOffset={4}
+                      avoidCollisions={false}
+                    >
                       <Calendar
                         mode="single"
                         selected={formData.startDate}
@@ -464,7 +470,13 @@ const CreateProgramModal: React.FC<CreateProgramModalProps> = ({
                         {formData.endDate ? format(formData.endDate, 'PPP') : 'Select date'}
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start" side="bottom">
+                    <PopoverContent
+                      className="w-auto p-0"
+                      align="center"
+                      side="bottom"
+                      sideOffset={4}
+                      avoidCollisions={false}
+                    >
                       <Calendar
                         mode="single"
                         selected={formData.endDate}
@@ -730,7 +742,7 @@ const CreateProgramModal: React.FC<CreateProgramModalProps> = ({
           )}
         </div>
 
-        <div className="flex justify-between px-6 py-4 border-t bg-background shrink-0">
+        <div className="flex justify-between px-5 py-3 border-t bg-background shrink-0">
           <Button variant="outline" onClick={handlePrev} disabled={currentStep === 1 || submitting}>
             <ChevronLeft className="w-4 h-4 mr-1" />
             Previous
