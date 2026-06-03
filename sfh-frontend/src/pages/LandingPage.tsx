@@ -209,7 +209,7 @@ const LandingNavbar: React.FC<{
   );
 
   return (
-    <header className="sticky top-0 z-50 border-b border-border/50 bg-white/80 backdrop-blur-xl">
+    <header className="sticky top-0 z-50 border-b border-white/10 bg-[#002147]/80 backdrop-blur-md shadow-lg shadow-black/10">
       <div className="container flex h-[4.25rem] items-center justify-between gap-4">
         <a
           href="#home"
@@ -223,13 +223,13 @@ const LandingNavbar: React.FC<{
             <img
               src={sfhLogo}
               alt="SFH Rwanda"
-              className="h-11 w-11 object-contain transition-transform group-hover:scale-105"
+              className="h-[5.25rem] w-[5.25rem] object-contain transition-transform group-hover:scale-105"
             />
           </div>
           <div className="hidden sm:block leading-tight">
-            <span className="block font-display font-bold text-foreground text-[15px]">SFH-OMS</span>
-            <span className="block text-[10px] font-medium text-muted-foreground tracking-wide uppercase">
-              Outreach Monitoring
+            <span className="block font-display font-bold text-white text-[15px]">SFH-OMS</span>
+            <span className="block text-[10px] font-medium text-blue-200/80 tracking-wide uppercase">
+              Outreach Monitoring System
             </span>
           </div>
         </a>
@@ -240,12 +240,12 @@ const LandingNavbar: React.FC<{
               key={item.href}
               type="button"
               onClick={() => handleNavClick(item.href)}
-              className="px-4 py-2 rounded-full text-sm font-medium text-muted-foreground hover:text-primary hover:bg-primary/5 transition-colors"
+              className="px-4 py-2 rounded-full text-sm font-medium text-blue-100/90 hover:text-white hover:bg-white/10 transition-colors"
             >
               {item.label}
             </button>
           ))}
-          <div className="ml-3 pl-3 border-l border-border">
+          <div className="ml-3 pl-3 border-l border-white/15">
             <LoginButton size="sm" showArrow={false}>
               Login
             </LoginButton>
@@ -258,7 +258,7 @@ const LandingNavbar: React.FC<{
           </LoginButton>
           <button
             type="button"
-            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border bg-card text-foreground"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white hover:bg-white/20"
             aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
             onClick={() => setMobileOpen(!mobileOpen)}
           >
@@ -268,13 +268,13 @@ const LandingNavbar: React.FC<{
       </div>
 
       {mobileOpen && (
-        <nav className="lg:hidden border-t border-border bg-card/95 backdrop-blur-lg px-4 py-3 flex flex-col gap-0.5">
+        <nav className="lg:hidden border-t border-white/10 bg-[#002147]/95 backdrop-blur-lg px-4 py-3 flex flex-col gap-0.5">
           {NAV_ITEMS.map((item) => (
             <button
               key={item.href}
               type="button"
               onClick={() => handleNavClick(item.href)}
-              className="text-left py-3 px-4 rounded-xl text-sm font-medium text-foreground hover:bg-muted transition-colors"
+              className="text-left py-3 px-4 rounded-xl text-sm font-medium text-blue-100 hover:bg-white/10 hover:text-white transition-colors"
             >
               {item.label}
             </button>
@@ -292,8 +292,8 @@ const LandingFooter: React.FC = () => (
         <div className="grid gap-10 lg:grid-cols-12 lg:gap-12">
           <div className="lg:col-span-5">
             <div className="flex items-start gap-4">
-              <div className="rounded-2xl bg-muted/60 p-3 ring-1 ring-border/80">
-                <img src={sfhLogo} alt="SFH Rwanda" className="h-14 w-14 object-contain" />
+              <div className="rounded-2xl bg-muted/60 p-4 ring-1 ring-border/80">
+                <img src={sfhLogo} alt="SFH Rwanda" className="h-14 w-18 object-contain" />
               </div>
               <div>
                 <p className="font-display text-xl font-bold text-foreground leading-snug">
@@ -439,8 +439,7 @@ const LandingPage: React.FC = () => {
                 What SFH-OMS does
               </h2>
               <p className="mt-3 text-muted-foreground text-lg">
-                Everything your outreach team needs — without switching between spreadsheets and
-                paper forms.
+                Everything your outreach team needs — managed through a single digital workspace that keeps everything in view.
               </p>
             </div>
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5 lg:gap-6">
