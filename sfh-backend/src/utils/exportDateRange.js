@@ -19,7 +19,11 @@ function parseExportDateRange({ period = 'monthly', month, year } = {}) {
     if (end > now) end = new Date(now);
     start = new Date(end);
     start.setDate(start.getDate() - 6);
-    start.setHours(0, 0, 0, 0);
+    if (start.getMonth() !== useMonth) {
+      start = new Date(useYear, useMonth, 1, 0, 0, 0, 0);
+    } else {
+      start.setHours(0, 0, 0, 0);
+    }
   } else {
     start = new Date(useYear, useMonth, 1, 0, 0, 0, 0);
     end = new Date(useYear, useMonth + 1, 0, 23, 59, 59, 999);

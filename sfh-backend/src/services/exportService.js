@@ -62,7 +62,7 @@ function computeImageDrawSize(imgRef, pageWidth, pageHeight, marginLeft, marginR
   return { imgW, imgH, imgX, blockHeight: imgH + 20 };
 }
 
-function assembleMultiPagePdf(pageStreams, imageObjects, pageWidth, pageHeight) {
+function assembleMultiPagePdf(pageStreams, imageObjects, pageWidth, pageHeight, reportTitle) {
   const objects = [];
 
   const addObject = (body) => {
@@ -71,9 +71,10 @@ function assembleMultiPagePdf(pageStreams, imageObjects, pageWidth, pageHeight) 
   };
 
   const fontId = addObject('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');
+  const fontBoldId = addObject('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>');
   const imageIds = {};
   imageObjects.forEach((img, idx) => {
-    const name = `Im${idx + 1}`;
+    const name = img.name || `Im${idx + 1}`;
     const filter = img.filter || 'DCTDecode';
     imageIds[name] = addObject(
       `<< /Type /XObject /Subtype /Image /Width ${img.width} /Height ${img.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /${filter} /Length ${img.buffer.length} >>\nstream\n${img.buffer.toString('binary')}\nendstream`
@@ -82,10 +83,60 @@ function assembleMultiPagePdf(pageStreams, imageObjects, pageWidth, pageHeight) 
 
   const xobjDict =
     imageObjects.length > 0
-      ? `/XObject<< ${imageObjects.map((_, idx) => `/Im${idx + 1} ${imageIds[`Im${idx + 1}`]} 0 R`).join(' ')} >>`
+      ? `/XObject<< ${imageObjects.map((img, idx) => {
+          const name = img.name || `Im${idx + 1}`;
+          return `/${name} ${imageIds[name]} 0 R`;
+        }).join(' ')} >>`
       : '';
 
-  const streamIds = pageStreams.map((streamBody) => {
+  const totalPages = pageStreams.length;
+  const logoImg = imageObjects.find(img => img.name === 'ImLogo');
+
+  const modifiedPageStreams = pageStreams.map((streamBody, idx) => {
+    const pageNum = idx + 1;
+    const headerFooterOps = [];
+
+    // --- Header ---
+    if (logoImg) {
+      const logoH = 20; // minimized size
+      const logoW = Math.floor(logoImg.width * (logoH / logoImg.height));
+      const logoY = 752; // y position in header
+      headerFooterOps.push(`q ${logoW} 0 0 ${logoH} 50 ${logoY} cm /ImLogo Do Q`);
+    }
+
+    const titleSize = 10;
+    const titleText = pdfSafe(reportTitle || 'SFH-OMS Report');
+    const titleX = Math.max(120, Math.floor(306 - (titleText.length * titleSize * 0.28)));
+    headerFooterOps.push(`BT /F2 ${titleSize} Tf 0.2 0.2 0.2 rg ${titleX} 757 Td (${titleText}) Tj ET`);
+
+    const dateText = new Date().toLocaleDateString('en-GB');
+    const dateX = Math.floor(562 - (dateText.length * 8 * 0.55));
+    headerFooterOps.push(`BT /F1 8 Tf 0.4 0.4 0.4 rg ${dateX} 757 Td (${dateText}) Tj ET`);
+
+    // line under header
+    headerFooterOps.push(`q 0.5 w 0.8 G 50 745 m 562 745 l S Q`);
+
+    // --- Footer ---
+    // line above footer
+    headerFooterOps.push(`q 0.5 w 0.8 G 50 45 m 562 45 l S Q`);
+
+    // Left: Society for Family Health Rwanda
+    headerFooterOps.push(`BT /F2 8 Tf 0.3 0.3 0.3 rg 50 32 Td (Society for Family Health Rwanda) Tj ET`);
+
+    // Center: SFH Outreach Monitoring System
+    const centerFoot = 'SFH Outreach Monitoring System';
+    const cfX = Math.floor(306 - (centerFoot.length * 8 * 0.28));
+    headerFooterOps.push(`BT /F1 8 Tf 0.4 0.4 0.4 rg ${cfX} 32 Td (${centerFoot}) Tj ET`);
+
+    // Right: Page X of Y
+    const pageStr = `Page ${pageNum} of ${totalPages}`;
+    const pageX = Math.floor(562 - (pageStr.length * 8 * 0.5));
+    headerFooterOps.push(`BT /F1 8 Tf 0.3 0.3 0.3 rg ${pageX} 32 Td (${pageStr}) Tj ET`);
+
+    return `${streamBody}\n${headerFooterOps.join('\n')}`;
+  });
+
+  const streamIds = modifiedPageStreams.map((streamBody) => {
     const stream = `${streamBody}\n`;
     return addObject(`<< /Length ${Buffer.byteLength(stream, 'utf8')} >>\nstream\n${stream}endstream`);
   });
@@ -93,7 +144,7 @@ function assembleMultiPagePdf(pageStreams, imageObjects, pageWidth, pageHeight) 
   const pageIds = streamIds.map(
     (streamId) =>
       addObject(
-        `<< /Type /Page /Parent __PAGES__ /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Contents ${streamId} 0 R /Resources<< /Font<< /F1 ${fontId} 0 R >> ${xobjDict} >> >>`
+        `<< /Type /Page /Parent __PAGES__ /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Contents ${streamId} 0 R /Resources<< /Font<< /F1 ${fontId} 0 R /F2 ${fontBoldId} 0 R >> ${xobjDict} >> >>`
       )
   );
 
@@ -132,11 +183,29 @@ function toFormattedPdf(title, sections, imageObjects = []) {
   const pageWidth = 612;
   const marginLeft = 50;
   const marginRight = 50;
-  const marginTop = 50;
-  const marginBottom = 50;
+  const marginTop = 85;
+  const marginBottom = 65;
   const lineHeight = 14;
   const fontSize = 10;
   const titleSize = 16;
+
+  // Synchronously load the SFH logo if it exists
+  const fs = require('fs');
+  const path = require('path');
+  const logoPath = path.join(__dirname, '..', '..', '..', 'sfh-frontend', 'src', 'assets', 'sfh-logo.jpg');
+  const { readJpegForPdf } = require('../utils/pdfImageEmbed');
+  const logoLoaded = readJpegForPdf(logoPath);
+  if (logoLoaded) {
+    if (!imageObjects.some(img => img.name === 'ImLogo')) {
+      imageObjects.push({
+        name: 'ImLogo',
+        buffer: logoLoaded.buffer,
+        width: logoLoaded.width,
+        height: logoLoaded.height,
+        filter: logoLoaded.filter
+      });
+    }
+  }
 
   const pageStreams = [];
   let ops = [];
@@ -152,17 +221,51 @@ function toFormattedPdf(title, sections, imageObjects = []) {
     if (y - needed < marginBottom) flushPage();
   };
 
-  const addText = (size, x, text) => {
-    ops.push(`BT /F1 ${size} Tf ${x} ${y} Td (${pdfSafe(text)}) Tj ET`);
+  const addText = (size, x, text, isBold = false) => {
+    const font = isBold ? '/F2' : '/F1';
+    ops.push(`BT ${font} ${size} Tf ${x} ${y} Td (${pdfSafe(text)}) Tj ET`);
   };
 
-  ops.push(`BT /F1 ${titleSize} Tf ${marginLeft} ${y} Td (${pdfSafe(title)}) Tj ET`);
+  const drawLineWithBolding = (line, size, startX) => {
+    const parts = line.split('|');
+    let currentX = startX;
+
+    parts.forEach((part, partIdx) => {
+      if (partIdx > 0) {
+        addText(size, currentX, '| ');
+        currentX += Math.floor(1.5 * size * 0.6);
+      }
+
+      const trimmedPart = part.trim();
+      const match = trimmedPart.match(/^([^:]+:)\s*(.*)$/);
+      if (match) {
+        const label = match[1] + ' ';
+        const value = match[2];
+        addText(size, currentX, label, true);
+        const labelOffset = Math.floor(label.length * size * 0.55);
+        addText(size, currentX + labelOffset, value, false);
+        currentX += labelOffset + Math.floor(value.length * size * 0.55) + 10;
+      } else {
+        addText(size, currentX, trimmedPart, false);
+        currentX += Math.floor(trimmedPart.length * size * 0.55) + 10;
+      }
+    });
+  };
+
+  // Draw main title on the first page
+  ops.push(`BT /F2 ${titleSize} Tf ${marginLeft} ${y} Td (${pdfSafe(title)}) Tj ET`);
   y -= 28;
 
   sections.forEach((section) => {
+    if (section.separator) {
+      ensureSpace(20);
+      ops.push(`q 0.5 w 0.8 G 50 ${y} m 562 ${y} l S Q`);
+      y -= 15;
+    }
+
     if (section.heading) {
-      ensureSpace(24);
-      addText(12, marginLeft, section.heading);
+      ensureSpace(28);
+      addText(12, marginLeft, section.heading, true);
       y -= 18;
     }
 
@@ -170,7 +273,27 @@ function toFormattedPdf(title, sections, imageObjects = []) {
       section.lines.forEach((line) => {
         wrapText(line, 88).forEach((wrapped) => {
           ensureSpace(lineHeight);
-          addText(fontSize, marginLeft, wrapped);
+          drawLineWithBolding(wrapped, fontSize, marginLeft);
+          y -= lineHeight;
+        });
+      });
+      y -= 6;
+    }
+
+    if (section.objectives) {
+      ensureSpace(lineHeight * section.objectives.length + 20);
+      addText(fontSize, marginLeft, 'Objectives', true);
+      y -= lineHeight;
+      
+      section.objectives.forEach((obj) => {
+        wrapText(obj, 82).forEach((wrapped, idx) => {
+          ensureSpace(lineHeight);
+          if (idx === 0) {
+            addText(fontSize, marginLeft + 10, '•', false);
+            addText(fontSize, marginLeft + 22, wrapped, false);
+          } else {
+            addText(fontSize, marginLeft + 22, wrapped, false);
+          }
           y -= lineHeight;
         });
       });
@@ -197,27 +320,43 @@ function toFormattedPdf(title, sections, imageObjects = []) {
     if (section.table) {
       const { headers, rows, colWidths } = section.table;
       const widths = colWidths || headers.map(() => Math.floor(500 / headers.length));
-      ensureSpace(lineHeight * 2);
+      
+      ensureSpace(lineHeight + 15);
       let x = marginLeft;
       headers.forEach((h, i) => {
-        ops.push(`BT /F1 ${fontSize} Tf ${x} ${y} Td (${pdfSafe(h)}) Tj ET`);
+        ops.push(`BT /F2 ${fontSize} Tf 0.1 0.1 0.1 rg ${x} ${y} Td (${pdfSafe(h)}) Tj ET`);
         x += widths[i];
       });
-      y -= lineHeight + 2;
+      y -= 4;
+      ops.push(`q 1 w 0.5 G 50 ${y} m 562 ${y} l S Q`);
+      y -= lineHeight;
 
       rows.forEach((row) => {
-        ensureSpace(lineHeight * 2);
-        x = marginLeft;
-        row.forEach((cell, i) => {
-          const maxLen = i === row.length - 1 && row.length <= 4 ? 55 : 22;
-          wrapText(String(cell ?? ''), maxLen).forEach((line, li) => {
-            if (li > 0) y -= lineHeight;
-            ensureSpace(lineHeight);
-            ops.push(`BT /F1 ${fontSize} Tf ${x} ${y} Td (${pdfSafe(line)}) Tj ET`);
-          });
-          x += widths[i] || 100;
+        const cellLines = row.map((cell, i) => {
+          const colWidth = widths[i] || 100;
+          const maxChars = Math.floor(colWidth * 0.16);
+          return wrapText(String(cell ?? ''), maxChars);
         });
-        y -= lineHeight;
+
+        const rowLineCount = Math.max(...cellLines.map((lines) => lines.length), 1);
+        const rowHeight = rowLineCount * lineHeight;
+
+        ensureSpace(rowHeight + 6);
+
+        for (let lineIdx = 0; lineIdx < rowLineCount; lineIdx += 1) {
+          x = marginLeft;
+          row.forEach((_, colIdx) => {
+            const lines = cellLines[colIdx];
+            if (lineIdx < lines.length) {
+              ops.push(`BT /F1 ${fontSize} Tf 0.2 0.2 0.2 rg ${x} ${y} Td (${pdfSafe(lines[lineIdx])}) Tj ET`);
+            }
+            x += widths[colIdx];
+          });
+          y -= lineHeight;
+        }
+        
+        ops.push(`q 0.5 w 0.9 G 50 ${y + 2} m 562 ${y + 2} l S Q`);
+        y -= 4;
       });
       y -= 8;
     }
@@ -229,7 +368,20 @@ function toFormattedPdf(title, sections, imageObjects = []) {
     pageStreams.push(ops.join('\n'));
   }
 
-  return assembleMultiPagePdf(pageStreams, imageObjects, pageWidth, pageHeight);
+  return assembleMultiPagePdf(pageStreams, imageObjects, pageWidth, pageHeight, title);
+}
+
+function emptyReportPdf(title, periodLabel) {
+  return toFormattedPdf(title, [
+    {
+      lines: [
+        `Generated: ${new Date().toLocaleString('en-GB')}`,
+        `Selected period: ${periodLabel}`,
+        '',
+        'No operational data available for the selected period.',
+      ],
+    },
+  ]);
 }
 
 async function resolveFieldReportImages(evidenceUrls, startIndex = 0) {
@@ -274,29 +426,31 @@ function emptyReportPdf(title, periodLabel) {
 
 async function fetchProgramSummaryReport(dateRange) {
   const { start, end } = dateRange;
-  const programs = await prisma.program.findMany({
+  return prisma.program.findMany({
+    where: {
+      startDate: { lte: end },
+      endDate: { gte: start },
+    },
     include: {
       fieldManager: { select: { name: true } },
       programVolunteers: {
+        where: { assignedAt: { lte: end } },
         include: {
           volunteer: { select: { id: true, name: true, status: true } },
         },
       },
-      beneficiaries: { select: { id: true } },
+      beneficiaries: {
+        where: { registrationDate: { gte: start, lte: end } },
+        select: { id: true },
+      },
       programResources: { include: { resource: { select: { name: true, unit: true } } } },
       fieldReports: {
-        where: createdAtInRange({}, start, end),
+        where: { createdAt: { gte: start, lte: end } },
         include: { volunteer: { select: { id: true, name: true } } },
         orderBy: { createdAt: 'desc' },
       },
     },
     orderBy: { startDate: 'desc' },
-  });
-
-  return programs.filter((p) => {
-    const overlap =
-      new Date(p.startDate) <= end && new Date(p.endDate) >= start;
-    return overlap || (p.fieldReports && p.fieldReports.length > 0);
   });
 }
 
@@ -313,7 +467,7 @@ async function fetchVolunteerActivityReport(dateRange) {
         select: { status: true, title: true, updatedAt: true },
       },
       fieldReports: {
-        where: createdAtInRange({}, start, end),
+        where: { createdAt: { gte: start, lte: end } },
         select: { id: true, status: true, createdAt: true, beneficiariesCount: true },
       },
       beneficiariesCreated: {
@@ -328,15 +482,13 @@ async function fetchGeographicCoverageReport(dateRange) {
   const { start, end } = dateRange;
   const programs = await prisma.program.findMany({
     where: {
-      OR: [
-        { startDate: { lte: end }, endDate: { gte: start } },
-        { fieldReports: { some: { createdAt: { gte: start, lte: end } } } },
-      ],
+      startDate: { lte: end },
+      endDate: { gte: start },
     },
     select: { title: true, district: true, sector: true, status: true },
   });
   const reports = await prisma.fieldReport.findMany({
-    where: createdAtInRange({}, start, end),
+    where: { createdAt: { gte: start, lte: end } },
     select: {
       location: true,
       beneficiariesCount: true,
@@ -351,10 +503,8 @@ async function fetchResourceUsageReport(dateRange) {
   return prisma.programResource.findMany({
     where: {
       program: {
-        OR: [
-          { startDate: { lte: end }, endDate: { gte: start } },
-          { fieldReports: { some: { createdAt: { gte: start, lte: end } } } },
-        ],
+        startDate: { lte: end },
+        endDate: { gte: start },
       },
     },
     include: {
@@ -415,6 +565,26 @@ const COLUMN_MAP = {
   ],
 };
 
+function formatObjectives(description) {
+  if (!description) return [];
+  let cleanDesc = description.replace(/^Objectives:\s*/gi, '');
+  const parts = cleanDesc.split(/(?:\b\d+\.\s*|•\s*|-\s*|\*\s*|Objectives:\s*)/gi);
+  const bullets = [];
+  parts.forEach(p => {
+    const trimmed = p.trim();
+    if (trimmed) {
+      bullets.push(trimmed);
+    }
+  });
+  if (bullets.length > 0) {
+    return bullets;
+  }
+  if (cleanDesc.trim()) {
+    return [cleanDesc.trim()];
+  }
+  return [];
+}
+
 async function buildReportPdf(reportType, data, meta) {
   const generated = new Date().toLocaleString('en-GB');
   const periodLabel = meta?.periodLabel || '';
@@ -424,7 +594,7 @@ async function buildReportPdf(reportType, data, meta) {
     case 'program_summary': {
       const programs = data;
       if (!programs.length) {
-        return emptyReportPdf('SFH OMS - Program Summary Report', periodLabel);
+        return emptyReportPdf('SFH-OMS Program Summary Report', periodLabel);
       }
       const sections = [
         {
@@ -435,7 +605,13 @@ async function buildReportPdf(reportType, data, meta) {
           ],
         },
       ];
+      let firstProgram = true;
       for (const p of programs) {
+        if (!firstProgram) {
+          sections.push({ separator: true });
+        }
+        firstProgram = false;
+
         const status = computeProgramStatus(p.startDate, p.endDate);
         const progress = computeProgramProgress({
           status,
@@ -445,17 +621,25 @@ async function buildReportPdf(reportType, data, meta) {
         });
         const reports = p.fieldReports || [];
         const beneficiariesReached = reports.reduce((s, r) => s + (r.beneficiariesCount || 0), 0);
+        
         sections.push({
           heading: 'Program Information',
           lines: [
             `Title: ${p.title}`,
             `Type: ${p.programType} | Status: ${status}`,
             `District/Sectors: ${p.district}${p.sector ? `, ${p.sector}` : ''}`,
-            `Objectives: ${(p.description || '').slice(0, 220)}`,
             `Dates: ${new Date(p.startDate).toLocaleDateString()} - ${new Date(p.endDate).toLocaleDateString()}`,
-            `Field manager: ${p.fieldManager?.name || 'N/A'}`,
+            `Field Manager: ${p.fieldManager?.name || 'N/A'}`,
           ],
         });
+
+        const objectivesList = formatObjectives(p.description);
+        if (objectivesList.length > 0) {
+          sections.push({
+            objectives: objectivesList
+          });
+        }
+
         sections.push({
           heading: 'Operational Metrics',
           lines: [
@@ -469,6 +653,7 @@ async function buildReportPdf(reportType, data, meta) {
             }`,
           ],
         });
+
         const volRows = (p.programVolunteers || []).map((pv) => {
           const v = pv.volunteer;
           const volReports = reports.filter((fr) => fr.volunteer?.id === v?.id);
@@ -477,13 +662,15 @@ async function buildReportPdf(reportType, data, meta) {
         });
         if (volRows.length) {
           sections.push({
+            heading: 'Volunteer Summary',
             table: {
-              headers: ['Volunteer', 'Status', 'Beneficiaries served', 'Reports submitted'],
+              headers: ['Volunteer', 'Status', 'Beneficiaries Served', 'Reports Submitted'],
               rows: volRows,
               colWidths: [130, 70, 120, 100],
             },
           });
         }
+
         const resRows = (p.programResources || []).map((pr) => [
           pr.resource?.name || '-',
           String(pr.quantityAssigned),
@@ -492,6 +679,7 @@ async function buildReportPdf(reportType, data, meta) {
         ]);
         if (resRows.length) {
           sections.push({
+            heading: 'Resource Allocation',
             table: {
               headers: ['Resource', 'Allocated', 'Used', 'Remaining'],
               rows: resRows,
@@ -499,37 +687,39 @@ async function buildReportPdf(reportType, data, meta) {
             },
           });
         }
+
         let imageCounter = 0;
         for (const fr of reports) {
           const { lines: imgLines, images, nextIndex } = await resolveFieldReportImages(fr.evidenceUrls, imageCounter);
           imageCounter = nextIndex;
           allImageObjects.push(...images);
+          
           sections.push({
             heading: 'Field Report',
             lines: [
               `Volunteer: ${fr.volunteer?.name || 'N/A'}`,
               `Submitted: ${new Date(fr.createdAt).toLocaleString('en-GB')} | Status: ${fr.status}`,
               `Location: ${fr.location}`,
-              `Beneficiaries reached: ${fr.beneficiariesCount}`,
-              `Notes: ${(fr.notes || '').slice(0, 300)}`,
-              ...(images.length === 0 ? ['Evidence: none attached'] : []),
+              `Beneficiaries Reached: ${fr.beneficiariesCount}`,
+              'Notes:',
+              fr.notes || 'No notes provided.',
+              ...(images.length === 0 ? ['Evidence:', 'None attached'] : ['Evidence:']),
             ],
           });
           if (images.length > 0) {
             sections.push({
-              lines: imgLines.length ? imgLines : ['Evidence photos:'],
               images: images.map((img) => ({ name: img.name, width: img.width, height: img.height })),
             });
           }
         }
       }
-      return toFormattedPdf('SFH OMS - Program Summary Report', sections, allImageObjects);
+      return toFormattedPdf('SFH-OMS Program Summary Report', sections, allImageObjects);
     }
 
     case 'geographic_coverage': {
       const { programs, reports } = data;
       if (!programs.length && !reports.length) {
-        return emptyReportPdf('SFH OMS - Geographic Coverage Report', periodLabel);
+        return emptyReportPdf('SFH-OMS Geographic Coverage Report', periodLabel);
       }
       const districtMap = {};
       programs.forEach((p) => {
@@ -558,13 +748,13 @@ async function buildReportPdf(reportType, data, meta) {
           ],
         });
       });
-      return toFormattedPdf('SFH OMS - Geographic Coverage Report', sections);
+      return toFormattedPdf('SFH-OMS Geographic Coverage Report', sections);
     }
 
     case 'resource_usage': {
       const rows = data;
       if (!rows.length) {
-        return emptyReportPdf('SFH OMS - Resource Usage Report', periodLabel);
+        return emptyReportPdf('SFH-OMS Resource Usage Report', periodLabel);
       }
       const tableRows = rows.map((pr) => {
         const remaining = Math.max(0, pr.quantityAssigned - pr.quantityUsed);
@@ -578,9 +768,10 @@ async function buildReportPdf(reportType, data, meta) {
           low ? 'LOW' : 'OK',
         ];
       });
-      return toFormattedPdf('SFH OMS - Resource Usage Report', [
+      return toFormattedPdf('SFH-OMS Resource Usage Report', [
         { lines: [`Generated: ${generated}`, `Period: ${periodLabel}`] },
         {
+          heading: 'Resource Allocation',
           table: {
             headers: ['Program', 'Resource', 'Allocated', 'Used', 'Remaining', 'Stock'],
             rows: tableRows,
@@ -682,7 +873,7 @@ async function exportData(entity, format, reportType, dateOpts = {}) {
         return {
           contentType: 'text/csv',
           filename: 'program_summary.csv',
-          body: toCsv([{ message: 'No operational data available for selected period.' }], cols),
+          body: toCsv([{ message: 'No operational data available for the selected period.' }], cols),
         };
       }
       const cols = [
@@ -708,7 +899,7 @@ async function exportData(entity, format, reportType, dateOpts = {}) {
         return {
           contentType: 'text/csv',
           filename: 'geographic_coverage.csv',
-          body: 'District,Sector,Programs Operating,Field Reports,Beneficiaries Reached\n"No operational data available for selected period.",,,,',
+          body: 'District,Sector,Programs Operating,Field Reports,Beneficiaries Reached\n"No operational data available for the selected period.",,,,',
         };
       }
       const cols = [
@@ -725,7 +916,7 @@ async function exportData(entity, format, reportType, dateOpts = {}) {
         return {
           contentType: 'text/csv',
           filename: 'resource_usage.csv',
-          body: 'Program,Resource,Allocated,Used,Remaining,Stock Status\n"No operational data available for selected period.",,,,,',
+          body: 'Program,Resource,Allocated,Used,Remaining,Stock Status\n"No operational data available for the selected period.",,,,,',
         };
       }
       const flat = rows.map((pr) => {
@@ -755,6 +946,7 @@ async function exportData(entity, format, reportType, dateOpts = {}) {
         name: v.name,
         email: v.email,
         district: v.volunteerDistrict,
+        focusDistrict: v.assignedTasks || [], // Keep reference
         tasksCompleted: (v.assignedTasks || []).filter((t) => t.status === 'COMPLETED').length,
         reports: (v.fieldReports || []).length,
         beneficiaries: (v.beneficiariesCreated || []).length,
@@ -776,7 +968,7 @@ async function exportData(entity, format, reportType, dateOpts = {}) {
       return {
         contentType: 'text/csv',
         filename: `${reportType || entity}.csv`,
-        body: 'Message\nNo operational data available for selected period.',
+        body: 'Message\nNo operational data available for the selected period.',
       };
     }
     return { contentType: 'text/csv', filename: `${entity}.csv`, body: toCsv(rows, columns || []) };
@@ -792,13 +984,13 @@ async function exportData(entity, format, reportType, dateOpts = {}) {
       return {
         contentType: 'application/pdf',
         filename: 'audit.pdf',
-        body: emptyReportPdf('SFH OMS - Audit Log Export', meta.periodLabel),
+        body: emptyReportPdf('SFH-OMS Audit Log Export', meta.periodLabel),
       };
     }
     return {
       contentType: 'application/pdf',
       filename: 'audit.pdf',
-      body: toFormattedPdf('SFH OMS - Audit Log Export', [
+      body: toFormattedPdf('SFH-OMS Audit Log Export', [
         { lines: [`Generated: ${new Date().toLocaleString('en-GB')}`, `Period: ${meta.periodLabel}`] },
         {
           table: {
@@ -820,7 +1012,7 @@ async function exportData(entity, format, reportType, dateOpts = {}) {
     return {
       contentType: 'application/pdf',
       filename: `${entity}.pdf`,
-      body: emptyReportPdf(`SFH OMS Export - ${entity}`, meta.periodLabel),
+      body: emptyReportPdf(`SFH-OMS Export - ${entity}`, meta.periodLabel),
     };
   }
 
@@ -842,7 +1034,7 @@ async function exportData(entity, format, reportType, dateOpts = {}) {
   return {
     contentType: 'application/pdf',
     filename: `${entity}.pdf`,
-    body: toFormattedPdf(`SFH OMS Export - ${entity}`, sections),
+    body: toFormattedPdf(`SFH-OMS Export - ${entity}`, sections),
   };
 }
 
