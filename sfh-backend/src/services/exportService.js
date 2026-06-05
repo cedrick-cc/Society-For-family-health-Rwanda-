@@ -84,9 +84,9 @@ function assembleMultiPagePdf(pageStreams, imageObjects, pageWidth, pageHeight, 
   const xobjDict =
     imageObjects.length > 0
       ? `/XObject<< ${imageObjects.map((img, idx) => {
-          const name = img.name || `Im${idx + 1}`;
-          return `/${name} ${imageIds[name]} 0 R`;
-        }).join(' ')} >>`
+        const name = img.name || `Im${idx + 1}`;
+        return `/${name} ${imageIds[name]} 0 R`;
+      }).join(' ')} >>`
       : '';
 
   const totalPages = pageStreams.length;
@@ -284,7 +284,7 @@ function toFormattedPdf(title, sections, imageObjects = []) {
       ensureSpace(lineHeight * section.objectives.length + 20);
       addText(fontSize, marginLeft, 'Objectives', true);
       y -= lineHeight;
-      
+
       section.objectives.forEach((obj) => {
         wrapText(obj, 82).forEach((wrapped, idx) => {
           ensureSpace(lineHeight);
@@ -320,7 +320,7 @@ function toFormattedPdf(title, sections, imageObjects = []) {
     if (section.table) {
       const { headers, rows, colWidths } = section.table;
       const widths = colWidths || headers.map(() => Math.floor(500 / headers.length));
-      
+
       ensureSpace(lineHeight + 15);
       let x = marginLeft;
       headers.forEach((h, i) => {
@@ -354,7 +354,7 @@ function toFormattedPdf(title, sections, imageObjects = []) {
           });
           y -= lineHeight;
         }
-        
+
         ops.push(`q 0.5 w 0.9 G 50 ${y + 2} m 562 ${y + 2} l S Q`);
         y -= 4;
       });
@@ -621,7 +621,7 @@ async function buildReportPdf(reportType, data, meta) {
         });
         const reports = p.fieldReports || [];
         const beneficiariesReached = reports.reduce((s, r) => s + (r.beneficiariesCount || 0), 0);
-        
+
         sections.push({
           heading: 'Program Information',
           lines: [
@@ -646,10 +646,9 @@ async function buildReportPdf(reportType, data, meta) {
             `Beneficiaries reached (period reports): ${beneficiariesReached}`,
             `Volunteers assigned: ${(p.programVolunteers || []).length}`,
             `Completion progress: ${progress}%`,
-            `Resources used: ${
-              (p.programResources || [])
-                .map((pr) => `${pr.resource?.name}: ${pr.quantityUsed}/${pr.quantityAssigned}`)
-                .join('; ') || 'None'
+            `Resources used: ${(p.programResources || [])
+              .map((pr) => `${pr.resource?.name}: ${pr.quantityUsed}/${pr.quantityAssigned}`)
+              .join('; ') || 'None'
             }`,
           ],
         });
@@ -693,7 +692,7 @@ async function buildReportPdf(reportType, data, meta) {
           const { lines: imgLines, images, nextIndex } = await resolveFieldReportImages(fr.evidenceUrls, imageCounter);
           imageCounter = nextIndex;
           allImageObjects.push(...images);
-          
+
           sections.push({
             heading: 'Field Report',
             lines: [
@@ -727,14 +726,24 @@ async function buildReportPdf(reportType, data, meta) {
           districtMap[p.district] = { programs: 0, sectors: new Set(), beneficiaries: 0, reports: 0 };
         }
         districtMap[p.district].programs += 1;
-        if (p.sector) districtMap[p.district].sectors.add(p.sector);
+        if (p.sector) {
+          p.sector.split(',').forEach((s) => {
+            const trimmed = s.trim();
+            if (trimmed) districtMap[p.district].sectors.add(trimmed);
+          });
+        }
       });
       reports.forEach((r) => {
         const d = r.program?.district || 'Unknown';
         if (!districtMap[d]) districtMap[d] = { programs: 0, sectors: new Set(), beneficiaries: 0, reports: 0 };
         districtMap[d].reports += 1;
         districtMap[d].beneficiaries += r.beneficiariesCount || 0;
-        if (r.program?.sector) districtMap[d].sectors.add(r.program.sector);
+        if (r.program?.sector) {
+          r.program.sector.split(',').forEach((s) => {
+            const trimmed = s.trim();
+            if (trimmed) districtMap[d].sectors.add(trimmed);
+          });
+        }
       });
       const sections = [{ lines: [`Generated: ${generated}`, `Period: ${periodLabel}`] }];
       Object.entries(districtMap).forEach(([district, info]) => {
@@ -744,7 +753,7 @@ async function buildReportPdf(reportType, data, meta) {
             `Programs operating: ${info.programs}`,
             `Field reports: ${info.reports}`,
             `Beneficiaries reached: ${info.beneficiaries}`,
-            `Sectors: ${[...info.sectors].join(', ') || 'District-wide'}`,
+            `Sectors: ${[...info.sectors].sort((a, b) => a.localeCompare(b)).join(', ') || 'District-wide'}`,
           ],
         });
       });
@@ -781,9 +790,90 @@ async function buildReportPdf(reportType, data, meta) {
       ]);
     }
 
-    case 'volunteer_activity':
-    case 'beneficiary_reach':
-      return null;
+    case 'volunteer_activity': {
+      const volunteers = data;
+      if (!volunteers.length) {
+        return emptyReportPdf('SFH-OMS Volunteer Activity Report', periodLabel);
+      }
+      const tableRows = volunteers.map((v) => {
+        const tasksCompleted = (v.assignedTasks || []).filter((t) => t.status === 'COMPLETED').length;
+        const reportsSubmitted = (v.fieldReports || []).length;
+        const beneficiariesRegistered = (v.beneficiariesCreated || []).length;
+        return [
+          v.name || '-',
+          v.email || '-',
+          v.volunteerDistrict || '-',
+          String(tasksCompleted),
+          String(reportsSubmitted),
+          String(beneficiariesRegistered),
+        ];
+      });
+
+      return toFormattedPdf('SFH-OMS Volunteer Activity Report', [
+        {
+          lines: [
+            `Generated: ${generated}`,
+            `Period: ${periodLabel}`,
+            `Active Volunteers: ${volunteers.length}`,
+          ],
+        },
+        {
+          heading: 'Volunteer Summary',
+          table: {
+            headers: [
+              'Volunteer Name',
+              'Email',
+              'District',
+              'Tasks Completed',
+              'Field Reports Submitted',
+              'Beneficiaries Registered',
+            ],
+            rows: tableRows,
+            colWidths: [100, 130, 80, 60, 70, 70],
+          },
+        },
+      ]);
+    }
+
+    case 'beneficiary_reach': {
+      const beneficiaries = data;
+      if (!beneficiaries.length) {
+        return emptyReportPdf('SFH-OMS Beneficiary Reach Report', periodLabel);
+      }
+      const tableRows = beneficiaries.map((b) => [
+        b.fullName || '-',
+        b.gender || '-',
+        String(b.age ?? '-'),
+        b.district || '-',
+        b.assignedProgram?.title || '-',
+        b.registrationDate ? new Date(b.registrationDate).toLocaleDateString('en-GB') : '-',
+      ]);
+
+      return toFormattedPdf('SFH-OMS Beneficiary Reach Report', [
+        {
+          lines: [
+            `Generated: ${generated}`,
+            `Period: ${periodLabel}`,
+            `Beneficiaries Registered: ${beneficiaries.length}`,
+          ],
+        },
+        {
+          heading: 'Beneficiary Registration Details',
+          table: {
+            headers: [
+              'Beneficiary Name',
+              'Gender',
+              'Age',
+              'District',
+              'Program',
+              'Registration Date',
+            ],
+            rows: tableRows,
+            colWidths: [120, 50, 40, 80, 130, 90],
+          },
+        },
+      ]);
+    }
 
     default:
       return null;
@@ -793,17 +883,28 @@ async function buildReportPdf(reportType, data, meta) {
 function programSummaryCsvRows(programs) {
   return programs.map((p) => {
     const status = computeProgramStatus(p.startDate, p.endDate);
+    const progress = computeProgramProgress({
+      status,
+      startDate: p.startDate,
+      endDate: p.endDate,
+      progress: p.progress,
+    });
     const reports = p.fieldReports || [];
     const latest = reports[0];
     const resourcesAllocated = (p.programResources || []).reduce((s, pr) => s + pr.quantityAssigned, 0);
     const resourcesUsed = (p.programResources || []).reduce((s, pr) => s + pr.quantityUsed, 0);
     const beneficiariesReached = reports.reduce((s, r) => s + (r.beneficiariesCount || 0), 0);
     return {
-      program: p.title,
-      district: p.district,
+      programTitle: p.title,
+      programType: p.programType,
       status,
+      district: p.district,
+      startDate: p.startDate ? new Date(p.startDate).toISOString().split('T')[0] : '',
+      endDate: p.endDate ? new Date(p.endDate).toISOString().split('T')[0] : '',
+      fieldManager: p.fieldManager?.name || 'N/A',
       volunteersAssigned: (p.programVolunteers || []).length,
       beneficiariesReached,
+      completionProgress: `${progress}%`,
       resourcesAllocated,
       resourcesUsed,
       fieldReportsCount: reports.length,
@@ -877,11 +978,16 @@ async function exportData(entity, format, reportType, dateOpts = {}) {
         };
       }
       const cols = [
-        { key: 'program', label: 'Program' },
-        { key: 'district', label: 'District' },
+        { key: 'programTitle', label: 'Program Title' },
+        { key: 'programType', label: 'Program Type' },
         { key: 'status', label: 'Status' },
+        { key: 'district', label: 'District' },
+        { key: 'startDate', label: 'Start Date' },
+        { key: 'endDate', label: 'End Date' },
+        { key: 'fieldManager', label: 'Field Manager' },
         { key: 'volunteersAssigned', label: 'Volunteers Assigned' },
         { key: 'beneficiariesReached', label: 'Beneficiaries Reached' },
+        { key: 'completionProgress', label: 'Completion Progress' },
         { key: 'resourcesAllocated', label: 'Resources Allocated' },
         { key: 'resourcesUsed', label: 'Resources Used' },
         { key: 'fieldReportsCount', label: 'Field Reports Count' },
@@ -960,6 +1066,35 @@ async function exportData(entity, format, reportType, dateOpts = {}) {
         { key: 'beneficiaries', label: 'Beneficiaries Registered' },
       ];
       return { contentType: 'text/csv', filename: 'volunteer_activity.csv', body: toCsv(flat, vCols) };
+    }
+    if (reportType === 'beneficiary_reach') {
+      if (!rows.length) {
+        const cols = [
+          { key: 'message', label: 'Message' },
+        ];
+        return {
+          contentType: 'text/csv',
+          filename: 'beneficiary_reach.csv',
+          body: toCsv([{ message: 'No operational data available for the selected period.' }], cols),
+        };
+      }
+      const flat = rows.map((b) => ({
+        fullName: b.fullName,
+        gender: b.gender,
+        age: b.age,
+        district: b.district,
+        program: b.assignedProgram?.title || '-',
+        registrationDate: b.registrationDate ? new Date(b.registrationDate).toISOString().split('T')[0] : '-',
+      }));
+      const bCols = [
+        { key: 'fullName', label: 'Beneficiary Name' },
+        { key: 'gender', label: 'Gender' },
+        { key: 'age', label: 'Age' },
+        { key: 'district', label: 'District' },
+        { key: 'program', label: 'Program' },
+        { key: 'registrationDate', label: 'Registration Date' },
+      ];
+      return { contentType: 'text/csv', filename: 'beneficiary_reach.csv', body: toCsv(flat, bCols) };
     }
     if (entity === 'audit') {
       columns = COLUMN_MAP.audit;
