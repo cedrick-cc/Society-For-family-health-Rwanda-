@@ -795,21 +795,7 @@ async function buildReportPdf(reportType, data, meta) {
       if (!volunteers.length) {
         return emptyReportPdf('SFH-OMS Volunteer Activity Report', periodLabel);
       }
-      const tableRows = volunteers.map((v) => {
-        const tasksCompleted = (v.assignedTasks || []).filter((t) => t.status === 'COMPLETED').length;
-        const reportsSubmitted = (v.fieldReports || []).length;
-        const beneficiariesRegistered = (v.beneficiariesCreated || []).length;
-        return [
-          v.name || '-',
-          v.email || '-',
-          v.volunteerDistrict || '-',
-          String(tasksCompleted),
-          String(reportsSubmitted),
-          String(beneficiariesRegistered),
-        ];
-      });
-
-      return toFormattedPdf('SFH-OMS Volunteer Activity Report', [
+      const sections = [
         {
           lines: [
             `Generated: ${generated}`,
@@ -817,22 +803,27 @@ async function buildReportPdf(reportType, data, meta) {
             `Active Volunteers: ${volunteers.length}`,
           ],
         },
-        {
-          heading: 'Volunteer Summary',
-          table: {
-            headers: [
-              'Volunteer Name',
-              'Email',
-              'District',
-              'Tasks Completed',
-              'Field Reports Submitted',
-              'Beneficiaries Registered',
-            ],
-            rows: tableRows,
-            colWidths: [100, 130, 80, 60, 70, 70],
-          },
-        },
-      ]);
+      ];
+
+      volunteers.forEach((v) => {
+        const tasksCompleted = (v.assignedTasks || []).filter((t) => t.status === 'COMPLETED').length;
+        const reportsSubmitted = (v.fieldReports || []).length;
+        const beneficiariesRegistered = (v.beneficiariesCreated || []).length;
+
+        sections.push({ separator: true });
+        sections.push({
+          lines: [
+            `Volunteer: ${v.name || '-'}`,
+            `Email: ${v.email || '-'}`,
+            `District: ${v.volunteerDistrict || '-'}`,
+            `Tasks Completed: ${tasksCompleted}`,
+            `Field Reports Submitted: ${reportsSubmitted}`,
+            `Beneficiaries Registered: ${beneficiariesRegistered}`,
+          ],
+        });
+      });
+
+      return toFormattedPdf('SFH-OMS Volunteer Activity Report', sections);
     }
 
     case 'beneficiary_reach': {
@@ -880,6 +871,34 @@ async function buildReportPdf(reportType, data, meta) {
   }
 }
 
+function parseProgramDescriptionParts(description) {
+  const result = {
+    descriptionText: '',
+    objectives: '',
+    teamLead: '',
+    otherResources: '',
+  };
+  if (!description) return result;
+
+  const chunks = description.split(/\r?\n\r?\n/);
+  const descChunks = [];
+  chunks.forEach((chunk) => {
+    const trimmed = chunk.trim();
+    const lower = trimmed.toLowerCase();
+    if (lower.startsWith('objectives:')) {
+      result.objectives = trimmed.substring(11).trim();
+    } else if (lower.startsWith('team lead:')) {
+      result.teamLead = trimmed.substring(10).trim();
+    } else if (lower.startsWith('other resources:')) {
+      result.otherResources = trimmed.substring(16).trim();
+    } else {
+      descChunks.push(trimmed);
+    }
+  });
+  result.descriptionText = descChunks.join('\n\n');
+  return result;
+}
+
 function programSummaryCsvRows(programs) {
   return programs.map((p) => {
     const status = computeProgramStatus(p.startDate, p.endDate);
@@ -894,6 +913,20 @@ function programSummaryCsvRows(programs) {
     const resourcesAllocated = (p.programResources || []).reduce((s, pr) => s + pr.quantityAssigned, 0);
     const resourcesUsed = (p.programResources || []).reduce((s, pr) => s + pr.quantityUsed, 0);
     const beneficiariesReached = reports.reduce((s, r) => s + (r.beneficiariesCount || 0), 0);
+
+    const parts = parseProgramDescriptionParts(p.description);
+    const volunteerNames = (p.programVolunteers || [])
+      .map((pv) => pv.volunteer?.name)
+      .filter(Boolean)
+      .join(', ');
+    const resourcesList = (p.programResources || [])
+      .map((pr) => `${pr.resource?.name || 'Unknown'}: ${pr.quantityUsed}/${pr.quantityAssigned} ${pr.resource?.unit || 'units'}`)
+      .join('; ');
+    const resourcesSummary = [resourcesList, parts.otherResources].filter(Boolean).join(' | ') || 'None';
+    const durationDays = p.startDate && p.endDate
+      ? Math.ceil((new Date(p.endDate).getTime() - new Date(p.startDate).getTime()) / (1000 * 60 * 60 * 24))
+      : 0;
+
     return {
       programTitle: p.title,
       programType: p.programType,
@@ -909,6 +942,11 @@ function programSummaryCsvRows(programs) {
       resourcesUsed,
       fieldReportsCount: reports.length,
       latestReportDate: latest ? new Date(latest.createdAt).toISOString() : '',
+      objectives: parts.objectives.replace(/\r?\n/g, '; ') || 'None',
+      teamLead: parts.teamLead || 'N/A',
+      volunteerNames: volunteerNames || 'None',
+      resourcesSummary,
+      programDuration: durationDays,
     };
   });
 }
@@ -992,6 +1030,11 @@ async function exportData(entity, format, reportType, dateOpts = {}) {
         { key: 'resourcesUsed', label: 'Resources Used' },
         { key: 'fieldReportsCount', label: 'Field Reports Count' },
         { key: 'latestReportDate', label: 'Latest Report Date' },
+        { key: 'objectives', label: 'Objectives' },
+        { key: 'teamLead', label: 'Team Lead' },
+        { key: 'volunteerNames', label: 'Volunteer Names' },
+        { key: 'resourcesSummary', label: 'Resources Summary' },
+        { key: 'programDuration', label: 'Program Duration (days)' },
       ];
       return {
         contentType: 'text/csv',

@@ -32,10 +32,17 @@ const AuditLogsPage: React.FC = () => {
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [searchQuery, setSearchQuery] = useState('');
   const [exporting, setExporting] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
 
   useEffect(() => {
     fetchAuditLogs().then((d) => setLogs(d as AuditLog[]));
   }, []);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [severity, searchQuery, dateRange]);
 
   const filtered = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -52,6 +59,26 @@ const AuditLogsPage: React.FC = () => {
       return true;
     });
   }, [logs, severity, searchQuery, dateRange]);
+
+  const totalPages = Math.ceil(filtered.length / itemsPerPage) || 1;
+  const paginatedLogs = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return filtered.slice(start, start + itemsPerPage);
+  }, [filtered, currentPage]);
+
+  const getPageNumbers = () => {
+    const pages = [];
+    const maxVisible = 5;
+    let start = Math.max(1, currentPage - 2);
+    let end = Math.min(totalPages, start + maxVisible - 1);
+    if (end - start < maxVisible - 1) {
+      start = Math.max(1, end - maxVisible + 1);
+    }
+    for (let i = start; i <= end; i++) {
+      pages.push(i);
+    }
+    return pages;
+  };
 
   const handleExport = async (fmt: 'csv' | 'pdf') => {
     setExporting(true);
@@ -125,35 +152,71 @@ const AuditLogsPage: React.FC = () => {
           {filtered.length === 0 ? (
             <EmptyState icon={FileText} title="No audit logs match filters" description="Adjust search, severity, or date range." />
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/50">
-                  <TableHead className="w-8" />
-                  <TableHead>Timestamp</TableHead>
-                  <TableHead>User</TableHead>
-                  <TableHead>Action</TableHead>
-                  <TableHead>Module</TableHead>
-                  <TableHead>Details</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtered.map((log) => (
-                  <TableRow key={log.id} className="hover:bg-muted/30">
-                    <TableCell>{getSeverityIcon(log.severity)}</TableCell>
-                    <TableCell className="text-sm font-mono">{log.timestamp}</TableCell>
-                    <TableCell className="font-medium">{log.user}</TableCell>
-                    <TableCell>
-                      <Badge variant="secondary" className={cn(
-                        log.severity === 'critical' && 'bg-destructive/10 text-destructive',
-                        log.severity === 'warning' && 'bg-warning/10 text-warning'
-                      )}>{log.action}</Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{log.module}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground max-w-xs truncate">{log.details}</TableCell>
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/50">
+                    <TableHead className="w-8" />
+                    <TableHead>Timestamp</TableHead>
+                    <TableHead>User</TableHead>
+                    <TableHead>Action</TableHead>
+                    <TableHead>Module</TableHead>
+                    <TableHead>Details</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {paginatedLogs.map((log) => (
+                    <TableRow key={log.id} className="hover:bg-muted/30">
+                      <TableCell>{getSeverityIcon(log.severity)}</TableCell>
+                      <TableCell className="text-sm font-mono">{log.timestamp}</TableCell>
+                      <TableCell className="font-medium">{log.user}</TableCell>
+                      <TableCell>
+                        <Badge variant="secondary" className={cn(
+                          log.severity === 'critical' && 'bg-destructive/10 text-destructive',
+                          log.severity === 'warning' && 'bg-warning/10 text-warning'
+                        )}>{log.action}</Badge>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">{log.module}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground max-w-xs truncate">{log.details}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              <div className="flex flex-col sm:flex-row items-center justify-between p-4 gap-4 border-t border-border bg-muted/20">
+                <div className="text-sm text-muted-foreground">
+                  Showing {Math.min(filtered.length, (currentPage - 1) * itemsPerPage + 1)}-{Math.min(filtered.length, currentPage * itemsPerPage)} of {filtered.length} records
+                </div>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                  >
+                    Previous
+                  </Button>
+                  {getPageNumbers().map((p) => (
+                    <Button
+                      key={p}
+                      variant={currentPage === p ? 'default' : 'outline'}
+                      size="sm"
+                      className="w-9 h-9 p-0"
+                      onClick={() => setCurrentPage(p)}
+                    >
+                      {p}
+                    </Button>
+                  ))}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
