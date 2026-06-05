@@ -44,19 +44,14 @@ const steps = [
 const PROGRAM_TYPE_KEYS = Object.keys(PROGRAM_TYPE_LABELS) as ProgramTypeKey[];
 
 const BENEFICIARY_AGE_MAPPINGS: Record<string, { min: string; max: string }> = {
-  'Children': { min: '0', max: '17' },
+  'Children': { min: '0', max: '9' },
   'Youth': { min: '18', max: '35' },
-  'Adults': { min: '36', max: '59' },
-  'Elderly': { min: '60', max: '120' },
-  'Pregnant Women': { min: '15', max: '49' },
+  'Married Adults': { min: '', max: '' },
+  'Elderly': { min: '60', max: '90' },
+  'Pregnant Women': { min: '15', max: '45' },
   'General Population': { min: '', max: '' },
   'People Living with HIV': { min: '', max: '' },
-  'Vulnerable household': { min: '25', max: '' },
-  // Dropdown options match mapping
-  'Children Under 5': { min: '0', max: '17' },
-  'Adolescents (10-19)': { min: '10', max: '19' },
-  'Women of Reproductive Age': { min: '15', max: '49' },
-  'Vulnerable Households': { min: '25', max: '' },
+  'Vulnerable Household': { min: '', max: '' },
 };
 
 const emptyForm = () => ({

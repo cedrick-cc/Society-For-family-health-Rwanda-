@@ -45,13 +45,14 @@ export const SECTORS_BY_DISTRICT: Record<string, string[]> = {
 };
 
 export const BENEFICIARY_CATEGORIES = [
-  'General Population',
-  'Women of Reproductive Age',
+  'Children',
+  'Youth',
+  'Married Adults',
+  'Elderly',
   'Pregnant Women',
-  'Children Under 5',
-  'Adolescents (10-19)',
+  'General Population',
   'People Living with HIV',
-  'Vulnerable Households',
+  'Vulnerable Household',
 ] as const;
 
 export function getSectorsForDistricts(districts: string[]): string[] {
