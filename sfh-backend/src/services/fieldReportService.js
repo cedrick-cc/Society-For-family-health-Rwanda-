@@ -1,7 +1,25 @@
 const { PrismaClient } = require('@prisma/client');
 const notificationService = require('./notificationService');
+const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
+const { reportDir } = require('../middleware/uploadFieldReport');
 
 const prisma = new PrismaClient();
+
+function getFileHash(filePath) {
+  return new Promise((resolve) => {
+    try {
+      const hash = crypto.createHash('sha256');
+      const stream = fs.createReadStream(filePath);
+      stream.on('data', (data) => hash.update(data));
+      stream.on('end', () => resolve(hash.digest('hex')));
+      stream.on('error', () => resolve(null));
+    } catch (e) {
+      resolve(null);
+    }
+  });
+}
 
 const reportInclude = {
   volunteer: { select: { id: true, name: true, email: true } },
@@ -71,6 +89,42 @@ async function submitReport({
     throw new Error('Provide both latitude and longitude, or leave both empty.');
   }
 
+  const hashes = [];
+  const urls = Array.isArray(evidenceUrls) ? evidenceUrls.map(String) : [];
+  for (const url of urls) {
+    const filename = path.basename(url);
+    const filePath = path.join(reportDir, filename);
+    const hash = await getFileHash(filePath);
+    if (hash) {
+      const duplicate = await prisma.fieldReport.findFirst({
+        where: {
+          imageHashes: {
+            has: hash,
+          },
+        },
+        select: { id: true },
+      });
+      if (duplicate) {
+        // Cleanup all uploaded files
+        for (const u of urls) {
+          const fn = path.basename(u);
+          const fp = path.join(reportDir, fn);
+          try {
+            if (fs.existsSync(fp)) {
+              fs.unlinkSync(fp);
+            }
+          } catch (err) {
+            // ignore
+          }
+        }
+        const err = new Error('This image has already been submitted in a previous field report. Please upload a different image.');
+        err.statusCode = 400;
+        throw err;
+      }
+      hashes.push(hash);
+    }
+  }
+
   const report = await prisma.fieldReport.create({
     data: {
       volunteerId,
@@ -82,7 +136,8 @@ async function submitReport({
       beneficiariesCount: Math.max(0, Number(beneficiariesCount) || 0),
       notes: String(notes || '').trim(),
       activityOutcome: activityOutcome ? String(activityOutcome).trim() : null,
-      evidenceUrls: Array.isArray(evidenceUrls) ? evidenceUrls.map(String) : [],
+      evidenceUrls: urls,
+      imageHashes: hashes,
       status: 'PENDING',
     },
     include: reportInclude,

@@ -1,11 +1,17 @@
+const path = require('path');
+const fs = require('fs');
+const { reportDir } = require('../middleware/uploadFieldReport');
 const fieldReportService = require('../services/fieldReportService');
 
 const submit = async (req, res) => {
+  const files = req.files || [];
   try {
     if (req.user.role !== 'VOLUNTEER') {
+      for (const f of files) {
+        try { fs.unlinkSync(path.join(reportDir, f.filename)); } catch (e) {}
+      }
       return res.status(403).json({ message: 'Only volunteers may submit field reports.' });
     }
-    const files = req.files || [];
     const evidenceUrls = files.map((f) => `/uploads/field-reports/${f.filename}`);
     const {
       programId,
@@ -32,6 +38,14 @@ const submit = async (req, res) => {
     });
     return res.status(201).json(report);
   } catch (error) {
+    for (const f of files) {
+      try {
+        const filePath = path.join(reportDir, f.filename);
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+      } catch (e) {}
+    }
     const code = error.statusCode || 400;
     return res.status(code).json({ message: error.message || 'Failed to submit report.' });
   }

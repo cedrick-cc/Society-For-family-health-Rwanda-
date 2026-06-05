@@ -43,6 +43,22 @@ const steps = [
 
 const PROGRAM_TYPE_KEYS = Object.keys(PROGRAM_TYPE_LABELS) as ProgramTypeKey[];
 
+const BENEFICIARY_AGE_MAPPINGS: Record<string, { min: string; max: string }> = {
+  'Children': { min: '0', max: '17' },
+  'Youth': { min: '18', max: '35' },
+  'Adults': { min: '36', max: '59' },
+  'Elderly': { min: '60', max: '120' },
+  'Pregnant Women': { min: '15', max: '49' },
+  'General Population': { min: '', max: '' },
+  'People Living with HIV': { min: '', max: '' },
+  'Vulnerable household': { min: '25', max: '' },
+  // Dropdown options match mapping
+  'Children Under 5': { min: '0', max: '17' },
+  'Adolescents (10-19)': { min: '10', max: '19' },
+  'Women of Reproductive Age': { min: '15', max: '49' },
+  'Vulnerable Households': { min: '25', max: '' },
+};
+
 const emptyForm = () => ({
   name: '',
   programType: '' as ProgramTypeKey | '',
@@ -189,10 +205,10 @@ const CreateProgramModal: React.FC<CreateProgramModalProps> = ({
       });
       const pr = Array.isArray(programToEdit.programResources) ? programToEdit.programResources : [];
       setSelectedResources(
-        pr.map((x: { resource?: { resourceKey?: string } }) => x.resource?.resourceKey).filter(Boolean) as string[]
+        pr.map((x) => x.resource?.resourceKey).filter(Boolean) as string[]
       );
       const qtyMap: Record<string, string> = {};
-      pr.forEach((x: { resource?: { resourceKey?: string }; quantityAssigned?: number }) => {
+      pr.forEach((x) => {
         if (x.resource?.resourceKey) qtyMap[x.resource.resourceKey] = String(x.quantityAssigned ?? 0);
       });
       setResourceQty(qtyMap);
@@ -235,8 +251,18 @@ const CreateProgramModal: React.FC<CreateProgramModalProps> = ({
     switch (currentStep) {
       case 1:
         return Boolean(formData.name && formData.programType);
-      case 2:
-        return Boolean(formData.startDate && formData.endDate);
+      case 2: {
+        if (!formData.startDate || !formData.endDate) return false;
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const start = new Date(formData.startDate);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(formData.endDate);
+        end.setHours(0, 0, 0, 0);
+        if (!programToEdit && start < today) return false;
+        if (end < start) return false;
+        return true;
+      }
       case 3:
         return formData.selectedDistricts.length > 0;
       case 4: {
@@ -298,6 +324,29 @@ const CreateProgramModal: React.FC<CreateProgramModalProps> = ({
       toast({
         title: 'Dates required',
         description: 'Please set both start and end dates.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const start = new Date(formData.startDate);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(formData.endDate);
+    end.setHours(0, 0, 0, 0);
+
+    if (!programToEdit && start < today) {
+      toast({
+        title: 'Invalid Start Date',
+        description: 'Start date must be today or a future date.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (end < start) {
+      toast({
+        title: 'Invalid End Date',
+        description: 'End date must be greater than or equal to Start Date.',
         variant: 'destructive',
       });
       return;
@@ -456,6 +505,16 @@ const CreateProgramModal: React.FC<CreateProgramModalProps> = ({
                         mode="single"
                         selected={formData.startDate}
                         onSelect={(date) => updateFormData('startDate', date)}
+                        disabled={(date) => {
+                          const today = new Date();
+                          today.setHours(0, 0, 0, 0);
+                          if (programToEdit && programToEdit.startDate) {
+                            const origStart = new Date(programToEdit.startDate);
+                            origStart.setHours(0, 0, 0, 0);
+                            return date < today && date.getTime() !== origStart.getTime();
+                          }
+                          return date < today;
+                        }}
                         className="pointer-events-auto"
                       />
                     </PopoverContent>
@@ -481,6 +540,16 @@ const CreateProgramModal: React.FC<CreateProgramModalProps> = ({
                         mode="single"
                         selected={formData.endDate}
                         onSelect={(date) => updateFormData('endDate', date)}
+                        disabled={(date) => {
+                          if (formData.startDate) {
+                            const start = new Date(formData.startDate);
+                            start.setHours(0, 0, 0, 0);
+                            return date < start;
+                          }
+                          const today = new Date();
+                          today.setHours(0, 0, 0, 0);
+                          return date < today;
+                        }}
                         className="pointer-events-auto"
                       />
                     </PopoverContent>
@@ -551,7 +620,15 @@ const CreateProgramModal: React.FC<CreateProgramModalProps> = ({
                 <Label>Target beneficiary category</Label>
                 <Select
                   value={formData.targetBeneficiaryCategory}
-                  onValueChange={(v) => updateFormData('targetBeneficiaryCategory', v)}
+                  onValueChange={(v) => {
+                    const mapping = BENEFICIARY_AGE_MAPPINGS[v];
+                    setFormData((prev) => ({
+                      ...prev,
+                      targetBeneficiaryCategory: v,
+                      minAge: mapping ? mapping.min : prev.minAge,
+                      maxAge: mapping ? mapping.max : prev.maxAge,
+                    }));
+                  }}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select category (optional)" />

@@ -13,6 +13,115 @@ import { mapApiFieldReportToUI } from '@/lib/api';
 import type { Program } from '@/lib/api';
 import type { Task } from '@/lib/api';
 
+function getExifDate(arrayBuffer: ArrayBuffer): Date | null {
+  const view = new DataView(arrayBuffer);
+  if (view.byteLength < 4) return null;
+  if (view.getUint16(0, false) !== 0xFFD8) return null;
+
+  let offset = 2;
+  const length = view.byteLength;
+  while (offset < length) {
+    if (offset + 4 > length) break;
+    const marker = view.getUint16(offset, false);
+    const markerLength = view.getUint16(offset + 2, false);
+    if (marker === 0xFFE1) {
+      const exifOffset = offset + 4;
+      if (exifOffset + 6 > length) break;
+      const isExif = 
+        view.getUint32(exifOffset, false) === 0x45786966 &&
+        view.getUint16(exifOffset + 4, false) === 0x0000;
+      if (!isExif) break;
+
+      const tiffOffset = exifOffset + 6;
+      if (tiffOffset + 8 > length) break;
+
+      const isLittleEndian = view.getUint16(tiffOffset, false) === 0x4949;
+      if (view.getUint16(tiffOffset + 2, !isLittleEndian) !== 0x002A) break;
+
+      const ifd0Offset = view.getUint32(tiffOffset + 4, !isLittleEndian);
+      const parseIFD = (ifdOffset: number): string | null => {
+        if (ifdOffset + 2 > length) return null;
+        const numEntries = view.getUint16(ifdOffset, !isLittleEndian);
+        let entryOffset = ifdOffset + 2;
+        let subExifOffset = 0;
+
+        for (let i = 0; i < numEntries; i++) {
+          if (entryOffset + 12 > length) break;
+          const tag = view.getUint16(entryOffset, !isLittleEndian);
+          const type = view.getUint16(entryOffset + 2, !isLittleEndian);
+          const count = view.getUint32(entryOffset + 4, !isLittleEndian);
+          const valueOffset = view.getUint32(entryOffset + 8, !isLittleEndian);
+
+          if ((tag === 0x9003 || tag === 0x9004 || tag === 0x0132) && type === 2) {
+            let dataOffset = tiffOffset + valueOffset;
+            if (count <= 4) {
+              dataOffset = entryOffset + 8;
+            }
+            if (dataOffset + count <= length) {
+              const chars: string[] = [];
+              for (let c = 0; c < count; c++) {
+                const charCode = view.getUint8(dataOffset + c);
+                if (charCode === 0) break;
+                chars.push(String.fromCharCode(charCode));
+              }
+              const str = chars.join('').trim();
+              if (str.match(/^\d{4}:\d{2}:\d{2}/)) {
+                return str;
+              }
+            }
+          } else if (tag === 0x8769) {
+            subExifOffset = valueOffset;
+          }
+          entryOffset += 12;
+        }
+
+        if (subExifOffset > 0) {
+          const res = parseIFD(tiffOffset + subExifOffset);
+          if (res) return res;
+        }
+        return null;
+      };
+
+      const dateStr = parseIFD(tiffOffset + ifd0Offset);
+      if (dateStr) {
+        const match = dateStr.match(/^(\d{4}):(\d{2}):(\d{2})\s+(\d{2}):(\d{2}):(\d{2})$/);
+        if (match) {
+          const [_, y, m, d, hh, mm, ss] = match;
+          const date = new Date(Number(y), Number(m) - 1, Number(d), Number(hh), Number(mm), Number(ss));
+          if (!isNaN(date.getTime())) {
+            return date;
+          }
+        }
+      }
+      break;
+    }
+    offset += 2 + markerLength;
+  }
+  return null;
+}
+
+async function validateImageAge(file: File): Promise<boolean> {
+  let imageDate: Date | null = null;
+  try {
+    const buffer = await file.arrayBuffer();
+    imageDate = getExifDate(buffer);
+  } catch (err) {
+    console.error('Failed to parse EXIF metadata', err);
+  }
+
+  if (!imageDate) {
+    imageDate = new Date(file.lastModified);
+  }
+
+  const now = new Date();
+  const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
+
+  if (imageDate < threeDaysAgo) {
+    return false;
+  }
+  return true;
+}
+
 interface SubmitFieldReportModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -121,11 +230,24 @@ const SubmitFieldReportModal: React.FC<SubmitFieldReportModalProps> = ({
     );
   };
 
-  const handlePhotoPick = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
-    const next = [...photos, ...Array.from(files)].slice(0, 5);
-    setPhotos(next);
+    
+    const validFiles: File[] = [];
+    for (const file of Array.from(files)) {
+      const isValid = await validateImageAge(file);
+      if (!isValid) {
+        toast.error("This image appears to be older than 3 days. Please upload a recent field activity photo.");
+        continue;
+      }
+      validFiles.push(file);
+    }
+    
+    if (validFiles.length > 0) {
+      const next = [...photos, ...validFiles].slice(0, 5);
+      setPhotos(next);
+    }
     e.target.value = '';
   };
 

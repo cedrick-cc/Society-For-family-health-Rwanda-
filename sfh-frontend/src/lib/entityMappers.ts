@@ -24,7 +24,7 @@ export type ProgramUI = {
   programResources?: Array<{
     quantityAssigned: number;
     quantityUsed: number;
-    resource?: { name: string; unit: string };
+    resource?: { name: string; unit: string; resourceKey?: string | null };
   }>;
   fieldManagerName?: string;
 };
@@ -64,7 +64,7 @@ export type ApiProgram = {
   programResources?: Array<{
     quantityAssigned: number;
     quantityUsed: number;
-    resource?: { name: string; unit: string };
+    resource?: { name: string; unit: string; resourceKey?: string | null };
   }>;
   fieldManagerId?: string | null;
   fieldManager?: { id: string; name?: string; email?: string } | null;

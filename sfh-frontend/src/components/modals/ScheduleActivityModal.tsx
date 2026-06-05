@@ -99,6 +99,12 @@ const ScheduleActivityModal: React.FC<ScheduleActivityModalProps> = ({ open, onO
       toast.error('Title, date, time, and district are required.');
       return;
     }
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (formData.date < today) {
+      toast.error('Date must be today or a future date.');
+      return;
+    }
     setLoading(true);
     try {
       await createScheduledActivity({
@@ -205,6 +211,11 @@ const ScheduleActivityModal: React.FC<ScheduleActivityModalProps> = ({ open, onO
                   mode="single"
                   selected={formData.date}
                   onSelect={(date) => updateFormData('date', date)}
+                  disabled={(date) => {
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    return date < today;
+                  }}
                   className="pointer-events-auto"
                 />
               </PopoverContent>

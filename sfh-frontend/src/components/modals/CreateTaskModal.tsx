@@ -24,6 +24,16 @@ import type { Program } from '@/lib/api';
 
 type VolunteerOpt = { id: string; name: string };
 
+const getLocalDatetimeString = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const hours = String(now.getHours()).padStart(2, '0');
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+};
+
 interface CreateTaskModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -83,6 +93,12 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ open, onOpenChange, p
     e.preventDefault();
     if (!programId || !volunteerId || !title.trim() || !dueDate) {
       toast.error('Program, volunteer, title, and due date are required.');
+      return;
+    }
+    const selectedDate = new Date(dueDate);
+    const now = new Date();
+    if (selectedDate < now) {
+      toast.error('Due date must be in the future.');
       return;
     }
     setSaving(true);
@@ -166,7 +182,13 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({ open, onOpenChange, p
           </div>
           <div className="space-y-2">
             <Label>Due date *</Label>
-            <Input type="datetime-local" value={dueDate} onChange={(e) => setDueDate(e.target.value)} required />
+            <Input
+              type="datetime-local"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              min={getLocalDatetimeString()}
+              required
+            />
           </div>
           <div className="space-y-2">
             <Label>Location</Label>

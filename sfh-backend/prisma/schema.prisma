@@ -228,6 +228,7 @@ model FieldReport {
   notes              String
   activityOutcome    String?
   evidenceUrls       String[]          @default([])
+  imageHashes        String[]          @default([])
   status             FieldReportStatus @default(PENDING)
   reviewedById       String?
   reviewedAt         DateTime?
