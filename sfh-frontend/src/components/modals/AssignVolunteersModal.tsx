@@ -37,6 +37,8 @@ type VolunteerRow = {
   volunteerDistrict?: string | null;
   programCount?: number;
   isLocalVolunteer?: boolean;
+  isAvailable?: boolean;
+  unavailableReason?: string | null;
   _count?: { programVolunteers?: number };
 };
 
@@ -118,7 +120,7 @@ const AssignVolunteersModal: React.FC<AssignVolunteersModalProps> = ({
 
   const toggle = (id: string) => {
     const row = available.find((v) => v.id === id);
-    if (row?.volunteerOpsStatus === 'ON_LEAVE') return;
+    if (row?.isAvailable === false) return;
     setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   };
 
@@ -255,18 +257,18 @@ const AssignVolunteersModal: React.FC<AssignVolunteersModalProps> = ({
               ) : (
                 <ul className="space-y-2 max-h-64 overflow-y-auto pr-1">
                   {filteredAvailable.map((v) => {
-                    const onLeave = v.volunteerOpsStatus === 'ON_LEAVE';
+                    const isDisabled = v.isAvailable === false;
                     return (
                       <label
                         key={v.id}
                         className={cn(
                           'flex items-start gap-2 rounded-lg border p-2 transition-colors',
-                          onLeave ? 'opacity-60 bg-muted/30 cursor-not-allowed' : 'cursor-pointer hover:bg-muted/40'
+                          isDisabled ? 'opacity-60 bg-muted/30 cursor-not-allowed' : 'cursor-pointer hover:bg-muted/40'
                         )}
                       >
                         <Checkbox
                           checked={selected.includes(v.id)}
-                          disabled={onLeave}
+                          disabled={isDisabled}
                           onCheckedChange={() => toggle(v.id)}
                           className="mt-1"
                         />
@@ -287,7 +289,7 @@ const AssignVolunteersModal: React.FC<AssignVolunteersModalProps> = ({
                                 variant="outline"
                                 className={cn(
                                   'text-xs',
-                                  onLeave && 'border-destructive/40 text-destructive bg-destructive/5'
+                                  isDisabled && 'border-destructive/40 text-destructive bg-destructive/5'
                                 )}
                               >
                                 {v.volunteerOpsStatus}
@@ -311,8 +313,10 @@ const AssignVolunteersModal: React.FC<AssignVolunteersModalProps> = ({
                               ))}
                             </div>
                           ) : null}
-                          {onLeave && (
-                            <p className="text-[11px] text-destructive mt-1">Cannot assign while on leave.</p>
+                          {isDisabled && v.unavailableReason && (
+                            <p className="text-[11px] text-destructive mt-1 font-medium">
+                              {v.unavailableReason}
+                            </p>
                           )}
                         </div>
                       </label>

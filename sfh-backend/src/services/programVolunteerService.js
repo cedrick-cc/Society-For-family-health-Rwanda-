@@ -28,12 +28,51 @@ async function assignVolunteers(programId, volunteerIds, assignedById) {
       id: { in: unique },
       role: 'VOLUNTEER',
       status: 'ACTIVE',
-      volunteerOpsStatus: { not: 'ON_LEAVE' },
     },
-    select: { id: true },
+    select: {
+      id: true,
+      volunteerOpsStatus: true,
+      programVolunteers: {
+        include: {
+          program: {
+            select: {
+              id: true,
+              status: true,
+              startDate: true,
+              endDate: true,
+            },
+          },
+        },
+      },
+    },
   });
   if (volunteers.length !== unique.length) {
-    throw new Error('One or more volunteers are invalid, inactive, on leave, or not volunteers.');
+    throw new Error('One or more volunteers are invalid, inactive, or not volunteers.');
+  }
+
+  // Validate that none of the volunteers are already assigned to a PLANNED, ACTIVE, or ONGOING program, or ON LEAVE
+  for (const volunteer of volunteers) {
+    if (volunteer.volunteerOpsStatus === 'ON_LEAVE') {
+      throw new Error('This volunteer is currently on leave and cannot be assigned.');
+    }
+
+    const assignments = volunteer.programVolunteers || [];
+    for (const assignment of assignments) {
+      const prog = assignment.program;
+      if (!prog) continue;
+      if (prog.id === programId) continue; // Exclude the program being assigned to
+
+      const statusFromDb = (prog.status || '').toUpperCase();
+      const statusComputed = computeProgramStatus(prog.startDate, prog.endDate);
+
+      const isUnavailable =
+        ['PLANNED', 'ACTIVE', 'ONGOING'].includes(statusFromDb) ||
+        ['PLANNED', 'ACTIVE', 'ONGOING'].includes(statusComputed);
+
+      if (isUnavailable) {
+        throw new Error('This volunteer is already assigned to another planned or active program and cannot be assigned again.');
+      }
+    }
   }
 
   const existing = await prisma.programVolunteer.findMany({
@@ -122,7 +161,6 @@ async function listAvailableVolunteers(programId) {
   const where = {
     role: 'VOLUNTEER',
     status: 'ACTIVE',
-    volunteerOpsStatus: { not: 'ON_LEAVE' },
   };
   if (assignedIds.length) where.id = { notIn: assignedIds };
 
@@ -136,6 +174,18 @@ async function listAvailableVolunteers(programId) {
       certifications: true,
       volunteerOpsStatus: true,
       volunteerDistrict: true,
+      programVolunteers: {
+        include: {
+          program: {
+            select: {
+              id: true,
+              status: true,
+              startDate: true,
+              endDate: true,
+            },
+          },
+        },
+      },
       _count: { select: { programVolunteers: true } },
     },
   });
@@ -147,11 +197,45 @@ async function listAvailableVolunteers(programId) {
     return a.name.localeCompare(b.name);
   });
 
-  return sorted.map(({ _count, ...rest }) => ({
-    ...rest,
-    isLocalVolunteer: programDistricts.has((rest.volunteerDistrict || '').toLowerCase()),
-    programCount: _count?.programVolunteers ?? 0,
-  }));
+  return sorted.map(({ _count, programVolunteers, ...rest }) => {
+    // Determine availability
+    let isAvailable = true;
+    let unavailableReason = null;
+
+    if (rest.volunteerOpsStatus === 'ON_LEAVE') {
+      isAvailable = false;
+      unavailableReason = 'Currently on leave';
+    } else {
+      const assignments = programVolunteers || [];
+      for (const assignment of assignments) {
+        const prog = assignment.program;
+        if (!prog) continue;
+
+        const statusFromDb = (prog.status || '').toUpperCase();
+        const statusComputed = computeProgramStatus(prog.startDate, prog.endDate);
+
+        const hasPlanned = statusFromDb === 'PLANNED' || statusComputed === 'PLANNED';
+        const hasActive = statusFromDb === 'ACTIVE' || statusFromDb === 'ONGOING' || statusComputed === 'ONGOING';
+
+        if (hasActive) {
+          isAvailable = false;
+          unavailableReason = 'Assigned to active program';
+          break; // Stop checking, active program takes precedence
+        } else if (hasPlanned) {
+          isAvailable = false;
+          unavailableReason = 'Assigned to planned program';
+        }
+      }
+    }
+
+    return {
+      ...rest,
+      isLocalVolunteer: programDistricts.has((rest.volunteerDistrict || '').toLowerCase()),
+      programCount: _count?.programVolunteers ?? 0,
+      isAvailable,
+      unavailableReason,
+    };
+  });
 }
 
 module.exports = {
