@@ -7,6 +7,17 @@ const { syncVolunteerOpsStatus } = require('../utils/volunteerOpsSync');
 
 const prisma = new PrismaClient();
 
+const NON_BLOCKING_PROGRAM_STATUSES = new Set(['COMPLETED', 'CANCELLED', 'CLOSED']);
+
+/** Block only when the program is effectively PLANNED or ONGOING (date-based), not stale DB status. */
+function isProgramBlockingAssignment(statusFromDb, startDate, endDate) {
+  const db = (statusFromDb || '').toUpperCase();
+  if (NON_BLOCKING_PROGRAM_STATUSES.has(db)) return false;
+
+  const computed = computeProgramStatus(startDate, endDate);
+  return computed === 'PLANNED' || computed === 'ONGOING';
+}
+
 async function assignVolunteers(programId, volunteerIds, assignedById) {
   const program = await prisma.program.findUnique({
     where: { id: programId },
@@ -62,14 +73,7 @@ async function assignVolunteers(programId, volunteerIds, assignedById) {
       if (!prog) continue;
       if (prog.id === programId) continue; // Exclude the program being assigned to
 
-      const statusFromDb = (prog.status || '').toUpperCase();
-      const statusComputed = computeProgramStatus(prog.startDate, prog.endDate);
-
-      const isUnavailable =
-        ['PLANNED', 'ACTIVE', 'ONGOING'].includes(statusFromDb) ||
-        ['PLANNED', 'ACTIVE', 'ONGOING'].includes(statusComputed);
-
-      if (isUnavailable) {
+      if (isProgramBlockingAssignment(prog.status, prog.startDate, prog.endDate)) {
         throw new Error('This volunteer is already assigned to another planned or active program and cannot be assigned again.');
       }
     }
@@ -211,17 +215,15 @@ async function listAvailableVolunteers(programId) {
         const prog = assignment.program;
         if (!prog) continue;
 
-        const statusFromDb = (prog.status || '').toUpperCase();
+        if (!isProgramBlockingAssignment(prog.status, prog.startDate, prog.endDate)) continue;
+
         const statusComputed = computeProgramStatus(prog.startDate, prog.endDate);
-
-        const hasPlanned = statusFromDb === 'PLANNED' || statusComputed === 'PLANNED';
-        const hasActive = statusFromDb === 'ACTIVE' || statusFromDb === 'ONGOING' || statusComputed === 'ONGOING';
-
-        if (hasActive) {
+        if (statusComputed === 'ONGOING') {
           isAvailable = false;
           unavailableReason = 'Assigned to active program';
-          break; // Stop checking, active program takes precedence
-        } else if (hasPlanned) {
+          break;
+        }
+        if (statusComputed === 'PLANNED') {
           isAvailable = false;
           unavailableReason = 'Assigned to planned program';
         }
