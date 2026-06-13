@@ -1,9 +1,19 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
+import { toast } from 'sonner';
 import AppSidebar from '@/components/AppSidebar';
 import TopHeader from '@/components/TopHeader';
 
+const TEMP_PASSWORD_TOAST_MESSAGE =
+  'Your account is still using a temporary password. Please change your password as soon as possible.';
+
 const DashboardLayout: React.FC = () => {
+  useEffect(() => {
+    if (sessionStorage.getItem('showTempPasswordToast') !== '1') return;
+    sessionStorage.removeItem('showTempPasswordToast');
+    toast.warning(TEMP_PASSWORD_TOAST_MESSAGE, { duration: 20000 });
+  }, []);
+
   return (
     <div className="h-screen flex w-full overflow-hidden">
       <AppSidebar />

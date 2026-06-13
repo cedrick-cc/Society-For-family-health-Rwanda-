@@ -28,6 +28,11 @@ import {
 } from '@/services/api';
 import UserAvatar from '@/components/UserAvatar';
 
+const TEMP_PASSWORD_NOTIFICATION_MESSAGE =
+  'Your account is still using a temporary password. Please change your password as soon as possible.';
+
+const TEMP_PASSWORD_NOTIFICATION_TYPES = new Set(['USER_CREATED', 'PASSWORD_RESET']);
+
 const TopHeader: React.FC = () => {
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
@@ -52,6 +57,7 @@ const TopHeader: React.FC = () => {
       unread: boolean;
       linkPath?: string;
       category?: string;
+      type?: string;
     }>
   >([]);
   const [notifFilter, setNotifFilter] = useState<'all' | 'unread'>('all');
@@ -74,12 +80,24 @@ const TopHeader: React.FC = () => {
   const refreshNotifications = useCallback(async () => {
     try {
       const list = await fetchNotifications();
-      setNotifications(list);
+      const mustChange = user?.mustChangePassword;
+      setNotifications(
+        list.map((n) => {
+          if (!mustChange || !n.type || !TEMP_PASSWORD_NOTIFICATION_TYPES.has(n.type)) {
+            return n;
+          }
+          return {
+            ...n,
+            title: 'Change your password',
+            message: TEMP_PASSWORD_NOTIFICATION_MESSAGE,
+          };
+        })
+      );
     } catch {
       setNotifications([]);
     }
     await refreshBadges();
-  }, [refreshBadges]);
+  }, [refreshBadges, user?.mustChangePassword]);
 
   useEffect(() => {
     refreshBadges();

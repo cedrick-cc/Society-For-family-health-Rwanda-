@@ -157,13 +157,17 @@ const VolunteersPage: React.FC = () => {
             Manage community health volunteers and track their contributions
           </p>
         </div>
-        <Button className="gap-2" onClick={() => setShowAddVolunteer(true)}>
-          <Plus className="w-4 h-4" />
-          Add Volunteer
-        </Button>
+        {user?.role === 'admin' && (
+          <Button className="gap-2" onClick={() => setShowAddVolunteer(true)}>
+            <Plus className="w-4 h-4" />
+            Add Volunteer
+          </Button>
+        )}
       </div>
 
-      <AddVolunteerModal open={showAddVolunteer} onOpenChange={setShowAddVolunteer} />
+      {user?.role === 'admin' && (
+        <AddVolunteerModal open={showAddVolunteer} onOpenChange={setShowAddVolunteer} />
+      )}
       <VolunteerProfileModal
         open={profileOpen}
         onOpenChange={setProfileOpen}

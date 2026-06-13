@@ -175,35 +175,49 @@ async function listMine(volunteerId) {
   });
 }
 
-async function listPendingForReview() {
+async function listPendingForReview(userId, role) {
+  const where = { status: 'PENDING' };
+  if (role === 'COORDINATOR') {
+    where.program = { createdById: userId };
+  }
   return prisma.fieldReport.findMany({
-    where: { status: 'PENDING' },
+    where,
     orderBy: { createdAt: 'asc' },
     take: 200,
     include: reportInclude,
   });
 }
 
-async function listRecent(limit = 20) {
+async function listRecent(limit = 20, userId, role) {
+  const where = role === 'COORDINATOR' ? { program: { createdById: userId } } : {};
   return prisma.fieldReport.findMany({
+    where,
     orderBy: { createdAt: 'desc' },
     take: limit,
     include: reportInclude,
   });
 }
 
-async function reviewReport(reportId, reviewerId, decision, reviewNotes) {
+async function reviewReport(reportId, reviewerId, reviewerRole, decision, reviewNotes) {
   if (!['APPROVED', 'REJECTED'].includes(decision)) {
     throw new Error('decision must be APPROVED or REJECTED.');
   }
 
   const report = await prisma.fieldReport.findUnique({
     where: { id: reportId },
-    include: { volunteer: { select: { id: true, name: true } } },
+    include: {
+      volunteer: { select: { id: true, name: true } },
+      program: { select: { id: true, createdById: true } },
+    },
   });
   if (!report) {
     const err = new Error('Report not found.');
     err.statusCode = 404;
+    throw err;
+  }
+  if (reviewerRole === 'COORDINATOR' && report.program?.createdById !== reviewerId) {
+    const err = new Error('You can only review reports for programs you own.');
+    err.statusCode = 403;
     throw err;
   }
   if (report.status !== 'PENDING') {

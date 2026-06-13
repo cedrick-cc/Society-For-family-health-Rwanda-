@@ -65,7 +65,7 @@ const listMine = async (req, res) => {
 
 const listPending = async (req, res) => {
   try {
-    const rows = await fieldReportService.listPendingForReview();
+    const rows = await fieldReportService.listPendingForReview(req.user.userId, req.user.role);
     return res.status(200).json(rows);
   } catch (error) {
     return res.status(500).json({ message: 'Failed to load pending reports.' });
@@ -74,7 +74,7 @@ const listPending = async (req, res) => {
 
 const listRecent = async (req, res) => {
   try {
-    const rows = await fieldReportService.listRecent(25);
+    const rows = await fieldReportService.listRecent(25, req.user.userId, req.user.role);
     return res.status(200).json(rows);
   } catch (error) {
     return res.status(500).json({ message: 'Failed to load reports.' });
@@ -84,7 +84,13 @@ const listRecent = async (req, res) => {
 const review = async (req, res) => {
   try {
     const { decision, reviewNotes } = req.body;
-    const updated = await fieldReportService.reviewReport(req.params.id, req.user.userId, decision, reviewNotes);
+    const updated = await fieldReportService.reviewReport(
+      req.params.id,
+      req.user.userId,
+      req.user.role,
+      decision,
+      reviewNotes
+    );
     return res.status(200).json(updated);
   } catch (error) {
     const code = error.statusCode || 400;

@@ -48,6 +48,13 @@ interface PendingFieldReport extends FieldReport {
 const item = { hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } };
 const container = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.08 } } };
 
+function getTimeBasedGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour >= 5 && hour < 12) return 'Good morning';
+  if (hour >= 12 && hour < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
 const CoordinatorDashboard: React.FC = () => {
   const { user } = useAuth();
   const [showCalendar, setShowCalendar] = useState(false);
@@ -192,7 +199,7 @@ const CoordinatorDashboard: React.FC = () => {
               Program Command Center
             </h1>
             <p className="text-muted-foreground mt-1">
-              Good morning, {user?.name?.split(' ')[0] || 'User'}.{' '}
+              {getTimeBasedGreeting()}, {user?.name?.split(' ')[0] || 'User'}.{' '}
               {pendingReports.length > 0 ? (
                 <>You have <span className="text-warning font-semibold">{pendingReports.length} reports awaiting review</span> today.</>
               ) : (

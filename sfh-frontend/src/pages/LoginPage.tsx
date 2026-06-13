@@ -23,7 +23,7 @@ const LoginPage: React.FC = () => {
     const result = await login(email, password);
     if (result.success) {
       if (result.mustChangePassword) {
-        setError('Temporary password detected. Please change your password from your profile settings.');
+        sessionStorage.setItem('showTempPasswordToast', '1');
       }
       navigate('/dashboard');
     } else {

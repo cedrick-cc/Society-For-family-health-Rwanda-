@@ -183,6 +183,9 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({ open, onOpenChange 
       });
       setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
       toast.success(response.message || 'Password changed successfully.');
+      if (user) {
+        updateUser({ ...user, mustChangePassword: false });
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to change password.');
     } finally {

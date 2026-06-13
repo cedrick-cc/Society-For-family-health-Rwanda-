@@ -185,7 +185,12 @@ const DashboardHome: React.FC = () => {
         <motion.div variants={itemVariants} className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-display font-bold text-foreground">
-              Welcome back, {user?.name?.split(' ')[0] || 'User'}!
+              Welcome back, {(() => {
+                const first = user?.name?.split(' ')[0];
+                if (!first) return 'Admin';
+                if (first.toLowerCase() === 'system') return 'Admin';
+                return first;
+              })()}!
             </h1>
             <p className="text-muted-foreground mt-1">
               Here's what's happening with your outreach programs today.

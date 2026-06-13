@@ -27,6 +27,7 @@ export interface User {
   /** Relative path from API origin, e.g. /uploads/profile-images/... */
   profileImage?: string | null;
   department?: string;
+  mustChangePassword?: boolean;
 }
 
 interface AuthContextType {
@@ -100,6 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           department: profile.department || '',
           profileImage: profile.profileImage || undefined,
           role: normalizeUserRole(profile.role),
+          mustChangePassword: Boolean(profile.mustChangePassword),
         };
         localStorage.setItem('user', JSON.stringify(merged));
         setUser(merged);
@@ -124,6 +126,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         ...data.user,
         role: normalizeUserRole(data.user?.role),
         profileImage: data.user.profileImage || undefined,
+        mustChangePassword: Boolean(data.mustChangePassword),
       };
 
       localStorage.setItem('token', data.token);
