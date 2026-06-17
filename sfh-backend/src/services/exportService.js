@@ -609,6 +609,7 @@ async function buildReportPdf(reportType, data, meta) {
         },
       ];
       let firstProgram = true;
+      let imageCounter = 0;
       for (const p of programs) {
         if (!firstProgram) {
           sections.push({ separator: true });
@@ -690,7 +691,6 @@ async function buildReportPdf(reportType, data, meta) {
           });
         }
 
-        let imageCounter = 0;
         for (const fr of reports) {
           const { lines: imgLines, images, nextIndex } = await resolveFieldReportImages(fr.evidenceUrls, imageCounter);
           imageCounter = nextIndex;
