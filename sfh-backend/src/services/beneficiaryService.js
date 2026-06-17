@@ -1,5 +1,6 @@
 const { PrismaClient } = require('@prisma/client');
 const { ageFromNationalId, isValidNationalIdFormat } = require('../utils/rwandaNationalId');
+const { computeProgramStatus } = require('../utils/programStatus');
 
 const prisma = new PrismaClient();
 
@@ -100,6 +101,10 @@ const createBeneficiary = async (data, registeredById, user) => {
   if (assignedProgramId) {
     const program = await prisma.program.findUnique({ where: { id: assignedProgramId } });
     if (!program) throw new Error('assignedProgramId does not match an existing program.');
+    const programStatus = computeProgramStatus(program.startDate, program.endDate);
+    if (programStatus === 'COMPLETED') {
+      throw new Error('Cannot register beneficiaries for a completed program.');
+    }
   }
 
   if (user) await assertProgramAccess(assignedProgramId, user);

@@ -77,7 +77,7 @@ const RegisterBeneficiaryModal: React.FC<RegisterBeneficiaryModalProps> = ({
 }) => {
   const { user } = useAuth();
   const [formData, setFormData] = useState(emptyForm);
-  const [programs, setPrograms] = useState<Array<{ id: string; title: string }>>([]);
+  const [programs, setPrograms] = useState<Array<{ id: string; title: string; status?: string }>>([]);
   const [programAgeLimits, setProgramAgeLimits] = useState<ProgramAgeLimits | null>(null);
   const [loadingPrograms, setLoadingPrograms] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -92,7 +92,13 @@ const RegisterBeneficiaryModal: React.FC<RegisterBeneficiaryModalProps> = ({
           user?.role === 'volunteer' ? await getProgramsAsVolunteer() : await getPrograms();
         if (cancelled) return;
         const list = Array.isArray(raw) ? raw : [];
-        const mapped = list.map((p: { id: string; title: string }) => ({ id: p.id, title: p.title }));
+        const mapped = list
+          .map((p: { id: string; title: string; status?: string }) => ({
+            id: p.id,
+            title: p.title,
+            status: p.status,
+          }))
+          .filter((p) => String(p.status || '').toUpperCase() !== 'COMPLETED');
         setPrograms(mapped);
         if (user?.role === 'volunteer' && mapped.length === 1 && !beneficiaryToEdit) {
           setFormData((prev) => ({ ...prev, program: mapped[0].id }));
@@ -202,6 +208,16 @@ const RegisterBeneficiaryModal: React.FC<RegisterBeneficiaryModalProps> = ({
       toast({
         title: 'Missing fields',
         description: 'Please complete name, gender, district, and program.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const selectedProgram = programs.find((p) => p.id === formData.program);
+    if (selectedProgram && String(selectedProgram.status || '').toUpperCase() === 'COMPLETED') {
+      toast({
+        title: 'Program completed',
+        description: 'Cannot register beneficiaries for a completed program.',
         variant: 'destructive',
       });
       return;

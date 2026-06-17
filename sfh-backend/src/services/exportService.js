@@ -264,9 +264,10 @@ function toFormattedPdf(title, sections, imageObjects = []) {
     }
 
     if (section.heading) {
-      ensureSpace(28);
+      ensureSpace(32);
+      y -= 6;
       addText(12, marginLeft, section.heading, true);
-      y -= 18;
+      y -= 20;
     }
 
     if (section.lines) {
@@ -277,7 +278,7 @@ function toFormattedPdf(title, sections, imageObjects = []) {
           y -= lineHeight;
         });
       });
-      y -= 6;
+      y -= 10;
     }
 
     if (section.objectives) {
@@ -289,7 +290,7 @@ function toFormattedPdf(title, sections, imageObjects = []) {
         wrapText(obj, 82).forEach((wrapped, idx) => {
           ensureSpace(lineHeight);
           if (idx === 0) {
-            addText(fontSize, marginLeft + 10, '•', false);
+            addText(fontSize, marginLeft + 10, '-', false);
             addText(fontSize, marginLeft + 22, wrapped, false);
           } else {
             addText(fontSize, marginLeft + 22, wrapped, false);
@@ -297,7 +298,7 @@ function toFormattedPdf(title, sections, imageObjects = []) {
           y -= lineHeight;
         });
       });
-      y -= 6;
+      y -= 10;
     }
 
     if (section.images) {
@@ -358,8 +359,10 @@ function toFormattedPdf(title, sections, imageObjects = []) {
         ops.push(`q 0.5 w 0.9 G 50 ${y + 2} m 562 ${y + 2} l S Q`);
         y -= 4;
       });
-      y -= 8;
+      y -= 10;
     }
+
+    y -= 8;
   });
 
   flushPage();

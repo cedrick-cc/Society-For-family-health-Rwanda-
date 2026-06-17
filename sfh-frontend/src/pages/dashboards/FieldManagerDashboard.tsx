@@ -21,7 +21,6 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import { EmptyState } from '@/components/ui/empty-state';
-import AddVolunteerModal from '@/components/modals/AddVolunteerModal';
 import ScheduleActivityModal from '@/components/modals/ScheduleActivityModal';
 import RegisterBeneficiaryModal from '@/components/modals/RegisterBeneficiaryModal';
 import AssignVolunteersModal from '@/components/modals/AssignVolunteersModal';
@@ -73,7 +72,6 @@ const statusConfig = {
 
 const FieldManagerDashboard: React.FC = () => {
   const { user } = useAuth();
-  const [showAddVolunteer, setShowAddVolunteer] = useState(false);
   const [showSchedule, setShowSchedule] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
@@ -493,7 +491,6 @@ const FieldManagerDashboard: React.FC = () => {
             </CardHeader>
             <CardContent className="grid grid-cols-2 gap-2">
               {[
-                { label: 'Add Volunteer', icon: Users, color: 'text-primary', action: () => setShowAddVolunteer(true) },
                 { label: 'Register Beneficiary', icon: ArrowUpRight, color: 'text-secondary', action: () => setShowRegister(true) },
                 { label: 'Schedule Activity', icon: Clock, color: 'text-accent', action: () => setShowSchedule(true) },
                 { label: 'Create Task', icon: ListTodo, color: 'text-info', action: () => setShowCreateTask(true) },
@@ -508,7 +505,6 @@ const FieldManagerDashboard: React.FC = () => {
         </motion.div>
       </motion.div>
 
-      <AddVolunteerModal open={showAddVolunteer} onOpenChange={setShowAddVolunteer} />
       <ScheduleActivityModal open={showSchedule} onOpenChange={setShowSchedule} />
       <CalendarModal open={showCalendar} onOpenChange={setShowCalendar} />
       <RegisterBeneficiaryModal open={showRegister} onOpenChange={setShowRegister} />

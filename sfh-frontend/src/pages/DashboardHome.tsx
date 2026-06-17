@@ -32,7 +32,6 @@ import { cn } from '@/lib/utils';
 // Import modals
 import CalendarModal from '@/components/modals/CalendarModal';
 import CreateProgramModal from '@/components/modals/CreateProgramModal';
-import AddVolunteerModal from '@/components/modals/AddVolunteerModal';
 import RegisterBeneficiaryModal from '@/components/modals/RegisterBeneficiaryModal';
 import ScheduleActivityModal from '@/components/modals/ScheduleActivityModal';
 import GenerateReportModal from '@/components/modals/GenerateReportModal';
@@ -44,7 +43,6 @@ const DashboardHome: React.FC = () => {
   // Modal states (must be before early returns for hooks rules)
   const [showCalendar, setShowCalendar] = useState(false);
   const [showCreateProgram, setShowCreateProgram] = useState(false);
-  const [showAddVolunteer, setShowAddVolunteer] = useState(false);
   const [showRegisterBeneficiary, setShowRegisterBeneficiary] = useState(false);
   const [showScheduleActivity, setShowScheduleActivity] = useState(false);
   const [showGenerateReport, setShowGenerateReport] = useState(false);
@@ -387,14 +385,6 @@ const DashboardHome: React.FC = () => {
                 <Button 
                   variant="outline" 
                   className="h-auto py-4 flex-col gap-2"
-                  onClick={() => setShowAddVolunteer(true)}
-                >
-                  <Users className="w-5 h-5 text-primary" />
-                  <span className="text-sm">Add Volunteer</span>
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="h-auto py-4 flex-col gap-2"
                   onClick={() => setShowRegisterBeneficiary(true)}
                 >
                   <HeartHandshake className="w-5 h-5 text-secondary" />
@@ -444,7 +434,6 @@ const DashboardHome: React.FC = () => {
         onOpenChange={setShowCreateProgram}
         onCompleted={reloadDashboardData}
       />
-      <AddVolunteerModal open={showAddVolunteer} onOpenChange={setShowAddVolunteer} />
       <RegisterBeneficiaryModal
         open={showRegisterBeneficiary}
         onOpenChange={setShowRegisterBeneficiary}

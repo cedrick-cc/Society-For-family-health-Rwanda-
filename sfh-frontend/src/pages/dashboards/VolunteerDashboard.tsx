@@ -29,7 +29,7 @@ import AnnouncementsCard from '@/components/AnnouncementsCard';
 import AssignedActivitiesCard from '@/components/AssignedActivitiesCard';
 import { type FieldReport } from '@/types/fieldReport';
 import { type Program, type Task, mapApiFieldReportToUI } from '@/lib/api';
-import { getVolunteerDashboard, updateTask } from '@/services/api';
+import { getVolunteerDashboard, updateTask, getBeneficiaries } from '@/services/api';
 import { mapApiProgramToUI, mapApiTaskToUI } from '@/lib/entityMappers';
 import type { ApiProgram } from '@/lib/entityMappers';
 import { toast } from 'sonner';
@@ -60,7 +60,7 @@ const VolunteerDashboard: React.FC = () => {
   const [myTasks, setMyTasks] = useState<Task[]>([]);
   const [myPrograms, setMyPrograms] = useState<Program[]>([]);
   const [fieldReports, setFieldReports] = useState<FieldReport[]>([]);
-  const [recentBeneficiaries] = useState<RecentBeneficiary[]>([]);
+  const [recentBeneficiaries, setRecentBeneficiaries] = useState<RecentBeneficiary[]>([]);
   const [taskBusyId, setTaskBusyId] = useState<string | null>(null);
   const [completeOpen, setCompleteOpen] = useState(false);
   const [completeId, setCompleteId] = useState<string | null>(null);
@@ -85,7 +85,38 @@ const VolunteerDashboard: React.FC = () => {
         setMyTasks([]);
         setFieldReports([]);
       });
-  }, []);
+
+    if (!user?.id) {
+      setRecentBeneficiaries([]);
+      return;
+    }
+
+    getBeneficiaries()
+      .then((rows: Array<{
+        fullName?: string;
+        registrationDate?: string;
+        status?: string | null;
+        servicesReceived?: string[];
+        assignedProgram?: { title?: string } | null;
+        registeredBy?: { id?: string } | null;
+        registeredById?: string;
+      }>) => {
+        const mine = (Array.isArray(rows) ? rows : []).filter(
+          (b) => (b.registeredBy?.id || b.registeredById) === user.id
+        );
+        setRecentBeneficiaries(
+          mine.slice(0, 5).map((b) => ({
+            name: b.fullName || 'Beneficiary',
+            service: b.assignedProgram?.title || b.servicesReceived?.[0] || 'Registration',
+            date: b.registrationDate
+              ? new Date(b.registrationDate).toLocaleDateString()
+              : '',
+            status: (b.status === 'completed' ? 'completed' : 'follow-up') as 'completed' | 'follow-up',
+          }))
+        );
+      })
+      .catch(() => setRecentBeneficiaries([]));
+  }, [user?.id]);
 
   useEffect(() => {
     reloadDashboard();
@@ -457,7 +488,7 @@ const VolunteerDashboard: React.FC = () => {
         </motion.div>
       </motion.div>
 
-      <RegisterBeneficiaryModal open={showRegister} onOpenChange={setShowRegister} />
+      <RegisterBeneficiaryModal open={showRegister} onOpenChange={setShowRegister} onSaved={reloadDashboard} />
       <CalendarModal open={showCalendar} onOpenChange={setShowCalendar} />
       <SubmitFieldReportModal
         open={showFieldReport}
