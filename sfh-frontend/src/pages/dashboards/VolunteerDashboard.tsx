@@ -35,7 +35,7 @@ import type { ApiProgram } from '@/lib/entityMappers';
 import { toast } from 'sonner';
 
 interface RecentBeneficiary {
-  name: string; service: string; date: string; status: 'completed' | 'follow-up';
+  name: string; service: string; date: string;
 }
 const item = { hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } };
 const container = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.08 } } };
@@ -111,7 +111,6 @@ const VolunteerDashboard: React.FC = () => {
             date: b.registrationDate
               ? new Date(b.registrationDate).toLocaleDateString()
               : '',
-            status: (b.status === 'completed' ? 'completed' : 'follow-up') as 'completed' | 'follow-up',
           }))
         );
       })
@@ -438,10 +437,6 @@ const VolunteerDashboard: React.FC = () => {
                         <p className="text-sm font-medium truncate">{b.name}</p>
                         <p className="text-xs text-muted-foreground">{b.service} · {b.date}</p>
                       </div>
-                      <span className={cn('px-2 py-0.5 rounded-full text-xs border font-medium flex-shrink-0',
-                        b.status === 'completed' ? 'bg-success/10 text-success border-success/20' : 'bg-warning/10 text-warning border-warning/20')}>
-                        {b.status}
-                      </span>
                     </div>
                   ))}
                 </div>
