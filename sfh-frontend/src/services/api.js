@@ -486,13 +486,14 @@ export async function getAuditLogs() {
   return apiRequest('/audit-logs');
 }
 
-export async function downloadExport(entity, format = 'csv', period, reportType, month, year) {
+export async function downloadExport(entity, format = 'csv', period, reportType, month, year, week) {
   const token = localStorage.getItem('token');
   const qs = new URLSearchParams({ format });
   if (period) qs.set('period', period);
   if (reportType) qs.set('reportType', reportType);
   if (month !== undefined && month !== null && month !== '') qs.set('month', String(month));
   if (year !== undefined && year !== null && year !== '') qs.set('year', String(year));
+  if (week !== undefined && week !== null && week !== '') qs.set('week', String(week));
   const response = await fetch(`${API_BASE_URL}/exports/${entity}?${qs}`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });

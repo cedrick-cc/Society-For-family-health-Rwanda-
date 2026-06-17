@@ -45,6 +45,7 @@ const exportEntity = async (req, res) => {
         period: req.query.period,
         month: req.query.month,
         year: req.query.year,
+        week: req.query.week,
       });
     }
 

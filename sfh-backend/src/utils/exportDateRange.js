@@ -1,7 +1,7 @@
 /**
  * Resolve export filter window from period + calendar month/year (frontend selectors).
  */
-function parseExportDateRange({ period = 'monthly', month, year } = {}) {
+function parseExportDateRange({ period = 'monthly', month, year, week } = {}) {
   const y = Number(year);
   const m = Number(month);
   const now = new Date();
@@ -15,15 +15,14 @@ function parseExportDateRange({ period = 'monthly', month, year } = {}) {
     start = new Date(useYear, 0, 1, 0, 0, 0, 0);
     end = new Date(useYear, 11, 31, 23, 59, 59, 999);
   } else if (period === 'weekly') {
-    end = new Date(useYear, useMonth + 1, 0, 23, 59, 59, 999);
-    if (end > now) end = new Date(now);
-    start = new Date(end);
-    start.setDate(start.getDate() - 6);
-    if (start.getMonth() !== useMonth) {
-      start = new Date(useYear, useMonth, 1, 0, 0, 0, 0);
-    } else {
-      start.setHours(0, 0, 0, 0);
-    }
+    const weekNum = Number(week);
+    const validWeek = Number.isFinite(weekNum) && weekNum >= 1 && weekNum <= 5 ? weekNum : 1;
+    const lastDayOfMonth = new Date(useYear, useMonth + 1, 0).getDate();
+    const weekStartDays = [1, 8, 15, 22, 29];
+    const startDay = weekStartDays[validWeek - 1];
+    const endDay = validWeek === 5 ? lastDayOfMonth : startDay + 6;
+    start = new Date(useYear, useMonth, startDay, 0, 0, 0, 0);
+    end = new Date(useYear, useMonth, endDay, 23, 59, 59, 999);
   } else {
     start = new Date(useYear, useMonth, 1, 0, 0, 0, 0);
     end = new Date(useYear, useMonth + 1, 0, 23, 59, 59, 999);

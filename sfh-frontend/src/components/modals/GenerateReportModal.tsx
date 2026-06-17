@@ -21,6 +21,14 @@ const reportTypes = [
   { value: 'resource_usage', label: 'Resource Usage Report', entity: 'inventory' },
 ];
 
+const weeks = [
+  { value: '1', label: 'Week 1 (1–7)' },
+  { value: '2', label: 'Week 2 (8–14)' },
+  { value: '3', label: 'Week 3 (15–21)' },
+  { value: '4', label: 'Week 4 (22–28)' },
+  { value: '5', label: 'Week 5 (29–End of Month)' },
+];
+
 const months = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
@@ -29,6 +37,7 @@ const months = [
 const GenerateReportModal: React.FC<GenerateReportModalProps> = ({ open, onOpenChange }) => {
   const [reportType, setReportType] = useState('');
   const [period, setPeriod] = useState('monthly');
+  const [week, setWeek] = useState('1');
   const [month, setMonth] = useState(String(new Date().getMonth()));
   const [year, setYear] = useState(String(new Date().getFullYear()));
   const [format, setFormat] = useState<'csv' | 'pdf'>('csv');
@@ -44,7 +53,7 @@ const GenerateReportModal: React.FC<GenerateReportModalProps> = ({ open, onOpenC
     }
     setLoading(true);
     try {
-      await downloadExport(selected.entity, format, period, selected.value, month, year);
+      await downloadExport(selected.entity, format, period, selected.value, month, year, period === 'weekly' ? week : undefined);
       toast.success(`${selected.label} downloaded.`);
       onOpenChange(false);
     } catch (e) {
@@ -98,6 +107,20 @@ const GenerateReportModal: React.FC<GenerateReportModalProps> = ({ open, onOpenC
               </SelectContent>
             </Select>
           </div>
+
+          {period === 'weekly' && (
+            <div className="space-y-2">
+              <Label>Select Week</Label>
+              <Select value={week} onValueChange={setWeek}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {weeks.map((w) => (
+                    <SelectItem key={w.value} value={w.value}>{w.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
