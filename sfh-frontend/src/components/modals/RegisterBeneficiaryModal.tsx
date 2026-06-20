@@ -1,5 +1,15 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -16,6 +26,8 @@ import {
   validateNationalIdFormat,
 } from '@/lib/rwandaDistricts';
 import { toast } from '@/hooks/use-toast';
+import { useFormDraft } from '@/hooks/useFormDraft';
+import { BENEFICIARY_REGISTRATION_DRAFT_KEY } from '@/lib/formDraftStorage';
 import { cn } from '@/lib/utils';
 
 export interface RegisterBeneficiaryModalProps {
@@ -68,6 +80,27 @@ const emptyForm = () => ({
 });
 
 type ProgramAgeLimits = { minAge?: number | null; maxAge?: number | null; title?: string };
+type BeneficiaryFormData = ReturnType<typeof emptyForm>;
+
+function hasBeneficiaryDraftContent(data: BeneficiaryFormData): boolean {
+  return Boolean(
+    data.firstName ||
+      data.lastName ||
+      data.phone ||
+      data.nationalId ||
+      data.ageGroup ||
+      data.gender ||
+      data.householdSize ||
+      data.district ||
+      data.sector ||
+      data.cell ||
+      data.program ||
+      data.referralSource ||
+      data.serviceType ||
+      data.healthConditions ||
+      data.notes
+  );
+}
 
 const RegisterBeneficiaryModal: React.FC<RegisterBeneficiaryModalProps> = ({
   open,
@@ -81,6 +114,31 @@ const RegisterBeneficiaryModal: React.FC<RegisterBeneficiaryModalProps> = ({
   const [programAgeLimits, setProgramAgeLimits] = useState<ProgramAgeLimits | null>(null);
   const [loadingPrograms, setLoadingPrograms] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  const draftEnabled = user?.role === 'volunteer' && !beneficiaryToEdit;
+  const {
+    showRestorePrompt,
+    restoreDraft,
+    discardDraft,
+    clearSavedDraft,
+  } = useFormDraft({
+    storageKey: BENEFICIARY_REGISTRATION_DRAFT_KEY,
+    open,
+    enabled: draftEnabled,
+    data: formData,
+    hasContent: hasBeneficiaryDraftContent,
+  });
+
+  const applyEmptyForm = useCallback(
+    (programList: Array<{ id: string }> = programs) => {
+      const next = emptyForm();
+      if (user?.role === 'volunteer' && programList.length === 1) {
+        next.program = programList[0].id;
+      }
+      setFormData(next);
+    },
+    [programs, user?.role]
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -100,8 +158,8 @@ const RegisterBeneficiaryModal: React.FC<RegisterBeneficiaryModalProps> = ({
           }))
           .filter((p) => String(p.status || '').toUpperCase() !== 'COMPLETED');
         setPrograms(mapped);
-        if (user?.role === 'volunteer' && mapped.length === 1 && !beneficiaryToEdit) {
-          setFormData((prev) => ({ ...prev, program: mapped[0].id }));
+        if (user?.role === 'volunteer' && mapped.length === 1 && !beneficiaryToEdit && !showRestorePrompt) {
+          setFormData((prev) => (prev.program ? prev : { ...prev, program: mapped[0].id }));
         }
       } catch {
         if (!cancelled) setPrograms([]);
@@ -112,7 +170,7 @@ const RegisterBeneficiaryModal: React.FC<RegisterBeneficiaryModalProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [open, user?.role, beneficiaryToEdit]);
+  }, [open, user?.role, beneficiaryToEdit, showRestorePrompt]);
 
   useEffect(() => {
     if (!open || !formData.program) {
@@ -138,8 +196,13 @@ const RegisterBeneficiaryModal: React.FC<RegisterBeneficiaryModalProps> = ({
     };
   }, [open, formData.program]);
 
+  const prevOpenRef = useRef(false);
+
   useEffect(() => {
-    if (!open) return;
+    const justOpened = open && !prevOpenRef.current;
+    prevOpenRef.current = open;
+    if (!open || !justOpened) return;
+
     if (beneficiaryToEdit) {
       const parts = (beneficiaryToEdit.fullName || '').trim().split(/\s+/);
       const firstName = parts[0] || '';
@@ -159,10 +222,12 @@ const RegisterBeneficiaryModal: React.FC<RegisterBeneficiaryModalProps> = ({
         program: beneficiaryToEdit.assignedProgramId || beneficiaryToEdit.assignedProgram?.id || '',
         riskLevel: (beneficiaryToEdit.riskLevel || 'medium').toLowerCase(),
       });
-    } else {
+    } else if (!draftEnabled) {
       setFormData(emptyForm());
+    } else {
+      applyEmptyForm();
     }
-  }, [open, beneficiaryToEdit]);
+  }, [open, beneficiaryToEdit, draftEnabled, applyEmptyForm]);
 
   const computedAgeFromId = useMemo(() => {
     if (beneficiaryToEdit || !formData.nationalId.trim()) return null;
@@ -280,12 +345,19 @@ const RegisterBeneficiaryModal: React.FC<RegisterBeneficiaryModalProps> = ({
         await createBeneficiary(payload);
         toast({ title: 'Beneficiary registered', description: fullName });
       }
+      if (draftEnabled) clearSavedDraft();
       onSaved?.();
       onOpenChange(false);
       setFormData(emptyForm());
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Request failed.';
-      toast({ title: 'Could not save', description: message, variant: 'destructive' });
+      toast({
+        title: 'Could not save',
+        description: draftEnabled
+          ? `${message} Submission failed. Your draft has been saved locally and can be restored later.`
+          : message,
+        variant: 'destructive',
+      });
     } finally {
       setSubmitting(false);
     }
@@ -293,7 +365,33 @@ const RegisterBeneficiaryModal: React.FC<RegisterBeneficiaryModalProps> = ({
 
   const submitBlocked = Boolean(ageValidation && !ageValidation.valid);
 
+  const handleRestoreDraft = () => {
+    const draft = restoreDraft();
+    if (draft) setFormData(draft);
+  };
+
+  const handleDiscardDraft = () => {
+    discardDraft();
+    applyEmptyForm();
+  };
+
   return (
+    <>
+    <AlertDialog open={showRestorePrompt}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Restore saved draft?</AlertDialogTitle>
+          <AlertDialogDescription>
+            A saved draft was found. Would you like to restore it?
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel onClick={handleDiscardDraft}>Discard Draft</AlertDialogCancel>
+          <AlertDialogAction onClick={handleRestoreDraft}>Restore Draft</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-xl w-[95vw] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
@@ -594,6 +692,7 @@ const RegisterBeneficiaryModal: React.FC<RegisterBeneficiaryModalProps> = ({
         </form>
       </DialogContent>
     </Dialog>
+    </>
   );
 };
 

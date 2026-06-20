@@ -1,5 +1,15 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,6 +20,8 @@ import { toast } from 'sonner';
 import type { FieldReport } from '@/types/fieldReport';
 import { submitFieldReport } from '@/services/api';
 import { mapApiFieldReportToUI } from '@/lib/api';
+import { FIELD_REPORT_DRAFT_KEY } from '@/lib/formDraftStorage';
+import { useFormDraft } from '@/hooks/useFormDraft';
 import type { Program } from '@/lib/api';
 import type { Task } from '@/lib/api';
 
@@ -122,6 +134,29 @@ async function validateImageAge(file: File): Promise<boolean> {
   return true;
 }
 
+interface FieldReportDraft {
+  selectedTaskId: string;
+  programId: string;
+  location: string;
+  latitude: string;
+  longitude: string;
+  beneficiariesServed: string;
+  description: string;
+  activityOutcome: string;
+}
+
+function hasFieldReportDraftContent(data: FieldReportDraft): boolean {
+  return Boolean(
+    data.selectedTaskId ||
+      data.location.trim() ||
+      data.latitude.trim() ||
+      data.longitude.trim() ||
+      data.beneficiariesServed.trim() ||
+      data.description.trim() ||
+      data.activityOutcome.trim()
+  );
+}
+
 interface SubmitFieldReportModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -149,21 +184,72 @@ const SubmitFieldReportModal: React.FC<SubmitFieldReportModalProps> = ({
   const [gpsLoading, setGpsLoading] = useState(false);
   const [gpsSuccess, setGpsSuccess] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const prevOpenRef = useRef(false);
 
-  useEffect(() => {
-    if (!open) return;
-    setSelectedTaskId('');
-    setProgramId(programs[0]?.id ? String(programs[0].id) : '');
-    setLocation('');
-    setLatitude('');
-    setLongitude('');
-    setBeneficiariesServed('');
-    setDescription('');
-    setActivityOutcome('');
+  const draftData = useMemo<FieldReportDraft>(
+    () => ({
+      selectedTaskId,
+      programId,
+      location,
+      latitude,
+      longitude,
+      beneficiariesServed,
+      description,
+      activityOutcome,
+    }),
+    [selectedTaskId, programId, location, latitude, longitude, beneficiariesServed, description, activityOutcome]
+  );
+
+  const {
+    showRestorePrompt,
+    restoreDraft,
+    discardDraft,
+    clearSavedDraft,
+  } = useFormDraft({
+    storageKey: FIELD_REPORT_DRAFT_KEY,
+    open,
+    enabled: true,
+    data: draftData,
+    hasContent: hasFieldReportDraftContent,
+  });
+
+  const resetForm = useCallback(
+    (defaultProgramId?: string) => {
+      setSelectedTaskId('');
+      setProgramId(defaultProgramId ?? (programs[0]?.id ? String(programs[0].id) : ''));
+      setLocation('');
+      setLatitude('');
+      setLongitude('');
+      setBeneficiariesServed('');
+      setDescription('');
+      setActivityOutcome('');
+      setPhotos([]);
+      setGpsLoading(false);
+      setGpsSuccess(false);
+    },
+    [programs]
+  );
+
+  const applyDraft = useCallback((draft: FieldReportDraft) => {
+    setSelectedTaskId(draft.selectedTaskId);
+    setProgramId(draft.programId);
+    setLocation(draft.location);
+    setLatitude(draft.latitude);
+    setLongitude(draft.longitude);
+    setBeneficiariesServed(draft.beneficiariesServed);
+    setDescription(draft.description);
+    setActivityOutcome(draft.activityOutcome);
     setPhotos([]);
     setGpsLoading(false);
-    setGpsSuccess(false);
-  }, [open, programs]);
+    setGpsSuccess(Boolean(draft.latitude && draft.longitude));
+  }, []);
+
+  useEffect(() => {
+    const justOpened = open && !prevOpenRef.current;
+    prevOpenRef.current = open;
+    if (!open || !justOpened) return;
+    resetForm();
+  }, [open, resetForm]);
 
   const tasksForProgram = tasks.filter(
     (t) => !programId || String((t as Task & { programId?: string }).programId || '') === programId
@@ -289,17 +375,47 @@ const SubmitFieldReportModal: React.FC<SubmitFieldReportModalProps> = ({
     try {
       const raw = await submitFieldReport(fd);
       const mapped = mapApiFieldReportToUI(raw as Record<string, unknown>);
+      clearSavedDraft();
       onSubmit(mapped as FieldReport);
       toast.success('Field report submitted successfully.');
       onOpenChange(false);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Submit failed.');
+      const message = err instanceof Error ? err.message : 'Submit failed.';
+      toast.error(message, {
+        description: 'Submission failed. Your draft has been saved locally and can be restored later.',
+      });
     } finally {
       setSubmitting(false);
     }
   };
 
+  const handleRestoreDraft = () => {
+    const draft = restoreDraft();
+    if (draft) applyDraft(draft as FieldReportDraft);
+  };
+
+  const handleDiscardDraft = () => {
+    discardDraft();
+    resetForm();
+  };
+
   return (
+    <>
+    <AlertDialog open={showRestorePrompt}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Restore saved draft?</AlertDialogTitle>
+          <AlertDialogDescription>
+            A saved draft was found. Would you like to restore it?
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel onClick={handleDiscardDraft}>Discard Draft</AlertDialogCancel>
+          <AlertDialogAction onClick={handleRestoreDraft}>Restore Draft</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-xl w-[95vw] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
@@ -462,6 +578,7 @@ const SubmitFieldReportModal: React.FC<SubmitFieldReportModalProps> = ({
         </form>
       </DialogContent>
     </Dialog>
+    </>
   );
 };
 
