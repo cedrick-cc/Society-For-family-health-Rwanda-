@@ -17,40 +17,14 @@ async function fieldManagerLinkedToVolunteer(fieldManagerId, volunteerId) {
   return volunteerLinkedToFieldManager(volunteerId, fieldManagerId);
 }
 
-async function canInitiateConversation(senderId, senderRole, peerId, peerRole) {
+async function canInitiateConversation(senderId, _senderRole, peerId, _peerRole) {
   if (senderId === peerId) return false;
 
   const peer = await prisma.user.findUnique({
     where: { id: peerId },
-    select: { id: true, role: true, status: true },
+    select: { id: true, status: true },
   });
-  if (!peer || peer.status !== 'ACTIVE') return false;
-
-  if (senderRole === 'ADMIN') {
-    return true;
-  }
-
-  if (senderRole === 'COORDINATOR') {
-    return ['FIELD_MANAGER', 'VOLUNTEER', 'ADMIN'].includes(peer.role);
-  }
-
-  if (senderRole === 'FIELD_MANAGER') {
-    if (peer.role === 'COORDINATOR' || peer.role === 'ADMIN') return true;
-    if (peer.role === 'VOLUNTEER') {
-      return fieldManagerLinkedToVolunteer(senderId, peerId);
-    }
-    return false;
-  }
-
-  if (senderRole === 'VOLUNTEER') {
-    if (peer.role === 'COORDINATOR') return true;
-    if (peer.role === 'FIELD_MANAGER') {
-      return volunteerLinkedToFieldManager(senderId, peerId);
-    }
-    return false;
-  }
-
-  return false;
+  return Boolean(peer && peer.status === 'ACTIVE');
 }
 
 async function findExistingDirectConversation(userA, userB) {
@@ -241,16 +215,43 @@ async function unreadMessagesTotal(userId) {
   });
 }
 
+function rolesMatchingQuery(q) {
+  const roleTokens = ['ADMIN', 'COORDINATOR', 'FIELD_MANAGER', 'ANALYST', 'VOLUNTEER'];
+  const lower = String(q || '').trim().toLowerCase();
+  if (!lower) return [];
+
+  const roleLabels = {
+    ADMIN: ['admin', 'administrator', 'system administrator'],
+    COORDINATOR: ['coordinator', 'program coordinator'],
+    FIELD_MANAGER: ['field manager', 'field_manager'],
+    ANALYST: ['analyst', 'data analyst'],
+    VOLUNTEER: ['volunteer', 'field staff'],
+  };
+
+  const matched = new Set();
+  for (const role of roleTokens) {
+    const roleLower = role.toLowerCase();
+    const roleSpaced = roleLower.replace(/_/g, ' ');
+    if (roleLower === lower.replace(/[\s-]+/g, '_') || roleSpaced.includes(lower) || lower.includes(roleSpaced)) {
+      matched.add(role);
+    }
+    for (const alias of roleLabels[role] || []) {
+      if (alias.includes(lower) || lower.includes(alias)) {
+        matched.add(role);
+      }
+    }
+  }
+  return Array.from(matched);
+}
+
 /**
- * Search active users the sender is allowed to message (name / email / role).
+ * Search active users by name / email / role.
  */
-async function searchMessagingPeers(senderId, senderRole, query) {
+async function searchMessagingPeers(senderId, _senderRole, query) {
   const q = String(query || '').trim();
   if (q.length < 2) return [];
 
-  const roleTokens = ['ADMIN', 'COORDINATOR', 'FIELD_MANAGER', 'ANALYST', 'VOLUNTEER'];
-  const upper = q.toUpperCase();
-  const roleFilter = roleTokens.includes(upper) ? { role: upper } : null;
+  const matchedRoles = rolesMatchingQuery(q);
 
   const users = await prisma.user.findMany({
     where: {
@@ -259,7 +260,7 @@ async function searchMessagingPeers(senderId, senderRole, query) {
       OR: [
         { name: { contains: q, mode: 'insensitive' } },
         { email: { contains: q, mode: 'insensitive' } },
-        ...(roleFilter ? [roleFilter] : []),
+        ...(matchedRoles.length ? [{ role: { in: matchedRoles } }] : []),
       ],
     },
     select: {
@@ -269,17 +270,11 @@ async function searchMessagingPeers(senderId, senderRole, query) {
       role: true,
       profileImage: true,
     },
-    take: 30,
+    take: 20,
     orderBy: { name: 'asc' },
   });
 
-  const out = [];
-  for (const u of users) {
-    // eslint-disable-next-line no-await-in-loop
-    const ok = await canInitiateConversation(senderId, senderRole, u.id, u.role);
-    if (ok) out.push(u);
-  }
-  return out.slice(0, 20);
+  return users;
 }
 
 module.exports = {

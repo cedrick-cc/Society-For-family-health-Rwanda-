@@ -135,9 +135,19 @@ const MessagesModal: React.FC<MessagesModalProps> = ({ open, onOpenChange }) => 
 
   const totalUnread = conversations.reduce((sum, c) => sum + (c.unread || 0), 0);
 
-  const filteredConversations = conversations.filter((c) =>
-    (c.peer?.name || '').toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const searchLower = searchQuery.trim().toLowerCase();
+  const filteredConversations = conversations.filter((c) => {
+    if (!searchLower) return true;
+    const peerRole = normalizeUserRole(c.peer?.role);
+    const peerRoleLabel = (roleLabels[peerRole] || '').toLowerCase();
+    return (
+      (c.peer?.name || '').toLowerCase().includes(searchLower) ||
+      (c.peer?.email || '').toLowerCase().includes(searchLower) ||
+      peerRoleLabel.includes(searchLower) ||
+      String(c.peer?.role || '').toLowerCase().includes(searchLower) ||
+      (c.lastMessage || '').toLowerCase().includes(searchLower)
+    );
+  });
 
   const handleSendMessage = async () => {
     if (!newMessage.trim() || !selectedId) return;
@@ -279,8 +289,14 @@ const MessagesModal: React.FC<MessagesModalProps> = ({ open, onOpenChange }) => 
               ) : filteredConversations.length === 0 ? (
                 <div className="p-8 text-center">
                   <MessageSquare className="w-10 h-10 text-muted-foreground mx-auto mb-2 opacity-50" />
-                  <p className="text-sm font-medium">No conversations yet</p>
-                  <p className="text-xs text-muted-foreground mt-1">Use + to find a colleague by name or email.</p>
+                  <p className="text-sm font-medium">
+                    {searchLower ? 'No matching conversations' : 'No conversations yet'}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {searchLower
+                      ? 'Try a different name, email, role, or message text.'
+                      : 'Use + to find a colleague by name or email.'}
+                  </p>
                 </div>
               ) : (
                 <div className="divide-y">
