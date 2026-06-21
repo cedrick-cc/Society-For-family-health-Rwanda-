@@ -2,7 +2,13 @@ import React, { useCallback, useState } from 'react';
 import type { Beneficiary } from '@/lib/api';
 import type { ApiBeneficiary } from '@/lib/entityMappers';
 import { mapApiBeneficiaryToUI } from '@/lib/entityMappers';
-import { getBeneficiaries, getBeneficiary, deleteBeneficiary } from '@/services/api';
+import {
+  getBeneficiaries,
+  getBeneficiary,
+  deleteBeneficiary,
+  getPrograms,
+  getProgramsAsVolunteer,
+} from '@/services/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { EmptyState } from '@/components/ui/empty-state';
 import { motion } from 'framer-motion';
@@ -22,7 +28,6 @@ import {
   HeartHandshake,
   ShieldCheck,
   Clock,
-  FileText,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -77,7 +82,8 @@ const BeneficiariesPage: React.FC = () => {
   const [beneficiaries, setBeneficiaries] = useState<Beneficiary[]>([]);
   const [rawBeneficiaries, setRawBeneficiaries] = useState<ApiBeneficiary[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [programFilter, setProgramFilter] = useState('all');
+  const [programs, setPrograms] = useState<{ id: string; title: string }[]>([]);
   const [showRegisterBeneficiary, setShowRegisterBeneficiary] = useState(false);
   const [beneficiaryToEdit, setBeneficiaryToEdit] = useState<ApiBeneficiary | null>(null);
   const [showScheduleFollowUp, setShowScheduleFollowUp] = useState(false);
@@ -104,6 +110,26 @@ const BeneficiariesPage: React.FC = () => {
   React.useEffect(() => {
     loadBeneficiaries();
   }, [loadBeneficiaries]);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const raw =
+          user?.role === 'volunteer' ? await getProgramsAsVolunteer() : await getPrograms();
+        if (cancelled) return;
+        const list = Array.isArray(raw) ? raw : [];
+        setPrograms(
+          list.map((p: { id: string; title: string }) => ({ id: p.id, title: p.title }))
+        );
+      } catch {
+        if (!cancelled) setPrograms([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.role]);
 
   const openProfile = async (id: string) => {
     setProfileOpen(true);
@@ -150,19 +176,6 @@ const BeneficiariesPage: React.FC = () => {
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'active':
-        return <Badge className="bg-success/10 text-success border-success/20 border">Active</Badge>;
-      case 'inactive':
-        return <Badge className="bg-muted text-muted-foreground border">Inactive</Badge>;
-      case 'completed':
-        return <Badge className="bg-accent/10 text-accent border-accent/20 border">Completed</Badge>;
-      default:
-        return <Badge variant="secondary">{status}</Badge>;
-    }
-  };
-
   const getRiskBadge = (risk: string) => {
     switch (risk) {
       case 'low':
@@ -181,8 +194,10 @@ const BeneficiariesPage: React.FC = () => {
       b.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       b.district.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (b.phone && b.phone.includes(searchQuery));
-    const matchesStatus = statusFilter === 'all' || b.status === statusFilter;
-    return matchesSearch && matchesStatus;
+    const raw = rawBeneficiaries.find((r) => r.id === b.id);
+    const matchesProgram =
+      programFilter === 'all' || raw?.assignedProgramId === programFilter;
+    return matchesSearch && matchesProgram;
   });
 
   const stats = {
@@ -348,16 +363,18 @@ const BeneficiariesPage: React.FC = () => {
                 className="pl-10"
               />
             </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <Select value={programFilter} onValueChange={setProgramFilter}>
               <SelectTrigger className="w-full sm:w-48">
                 <Filter className="w-4 h-4 mr-2" />
-                <SelectValue placeholder="Filter by status" />
+                <SelectValue placeholder="Filter by program" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="inactive">Inactive</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
+                <SelectItem value="all">All Programs</SelectItem>
+                {programs.map((program) => (
+                  <SelectItem key={program.id} value={program.id}>
+                    {program.title}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -372,7 +389,7 @@ const BeneficiariesPage: React.FC = () => {
               <TableHead className="font-semibold">Beneficiary</TableHead>
               <TableHead className="font-semibold">Location</TableHead>
               <TableHead className="font-semibold">Services</TableHead>
-              <TableHead className="font-semibold">Status</TableHead>
+              <TableHead className="font-semibold">Program</TableHead>
               <TableHead className="font-semibold">Risk</TableHead>
               <TableHead className="text-right font-semibold">Actions</TableHead>
             </TableRow>
@@ -420,7 +437,11 @@ const BeneficiariesPage: React.FC = () => {
                     )}
                   </div>
                 </TableCell>
-                <TableCell>{getStatusBadge(beneficiary.status)}</TableCell>
+                <TableCell>
+                  <span className="text-sm">
+                    {beneficiary.assignedProgramTitle || 'Unassigned'}
+                  </span>
+                </TableCell>
                 <TableCell>{getRiskBadge(beneficiary.riskLevel)}</TableCell>
                 <TableCell className="text-right">
                   <DropdownMenu>
@@ -440,10 +461,6 @@ const BeneficiariesPage: React.FC = () => {
                           Edit Details
                         </DropdownMenuItem>
                       )}
-                      <DropdownMenuItem onClick={() => toast({ title: 'Service record', description: 'Coming soon.' })}>
-                        <FileText className="w-4 h-4 mr-2" />
-                        Add Service Record
-                      </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => setShowScheduleFollowUp(true)}>
                         <Calendar className="w-4 h-4 mr-2" />
                         Schedule Follow-up

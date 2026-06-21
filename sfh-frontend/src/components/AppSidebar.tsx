@@ -13,7 +13,6 @@ import {
   FileText,
   Shield,
   Bell,
-  HelpCircle,
   Package,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -244,17 +243,6 @@ const AppSidebar: React.FC = () => {
           </div>
         </div>
       )}
-
-      {/* Help Section */}
-      <div className="p-3 border-t border-sidebar-border">
-        <NavLink
-          to="/dashboard/help"
-          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-sidebar-muted hover:text-sidebar-foreground hover:bg-sidebar-accent transition-all duration-200"
-        >
-          <HelpCircle className="w-5 h-5 flex-shrink-0" />
-          {!collapsed && <span>Help & Support</span>}
-        </NavLink>
-      </div>
     </motion.aside>
   );
 };
